@@ -1,4 +1,5 @@
 *.npy
+*.log
 toxic/sc/stacking/obj/
 *.csv
 *.json
