@@ -1,5 +1,59 @@
 data reading
 data cleaning
+count
+['app', 'channel']
+['app', 'device', 'channel', 'day', 'hour']
+['app', 'device', 'day', 'hour']
+['app', 'os', 'channel', 'day', 'hour']
+['ip', 'day']
+['ip']
+['ip', 'app', 'device', 'channel', 'day']
+['ip', 'app', 'device', 'day']
+['ip', 'app', 'device', 'os', 'day', 'hour']
+['ip', 'app', 'os', 'channel']
+['ip', 'app', 'os', 'channel', 'day']
+['ip', 'os']
+['app', 'day', 'hourminute']
+['device', 'os', 'day', 'hourminute10']
+['ip', 'device', 'os', 'day', 'hourminute10']
+unique count
+['day', 'ip', 'machine']
+['day', 'ip', 'os']
+['day', 'ip', 'device']
+['day', 'ip', 'app']
+['day', 'ip', 'channel']
+['machine', 'app']
+['machine', 'ip']
+['machine', 'channel']
+cummulative count
+['ip', 'app', 'device', 'os', 'day', 'hour']
+['ip', 'day']
+['app', 'device', 'os', 'day']
+count ratio
+['ip', 'machine']
+['ip', 'channel']
+['machine', 'ip']
+['app', 'channel']
+['channel', 'app']
+cumulative count ratio
+['ip', 'day']
+time to next
+['day', 'ip', 'app', 'device', 'os']
+range count
+['ip', 'day']
+['ip', 'day', 'hour']
+['ip', 'dayhourminute']
+['ip', 'dayhourminute10']
+['app', 'os', 'channel', 'dayhourminute']
+['app', 'os', 'channel', 'dayhourminute10']
+['ip', 'channel', 'dayhourminute']
+['ip', 'channel', 'dayhourminute10']
+['ip', 'device', 'os', 'dayhourminute']
+['ip', 'device', 'os', 'dayhourminute10']
+var
+['ip', 'device', 'hour']
+common ip
+['ip', 'day']
 woe
 ['ip']
 ['app']
@@ -42,3 +96,4 @@ woe
 ['device', 'os', 'nextClickLeakDayFlt']
 ['device', 'channel', 'nextClickLeakDayFlt']
 ['os', 'channel', 'nextClickLeakDayFlt']
+done
