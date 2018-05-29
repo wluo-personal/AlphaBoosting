@@ -1,1 +1,3 @@
-ip,day,click_timestamp,is_attributed
+a,b
+1,[1,2,3]
+2,[4,5,6]

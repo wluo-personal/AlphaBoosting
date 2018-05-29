@@ -1,5 +1,3 @@
-data reading
-data cleaning
 woe
 ['ip']
 ['app']
