@@ -9,3 +9,7 @@
 ['ip', 'channel']
 ['app', 'device']
 ['app', 'os']
+['app', 'channel']
+['ip', 'app', 'device']
+['ip', 'app', 'os']
+['ip', 'app', 'channel']
