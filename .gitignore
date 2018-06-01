@@ -6,6 +6,8 @@ toxic/sc/stacking/obj/
 *.hdf5
 .ipynb_checkpoints
 *.pyc
+*.pkl
+*.ftr
 
 # Experiment files
 exp_*
