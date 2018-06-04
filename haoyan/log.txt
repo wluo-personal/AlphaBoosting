@@ -1,15 +1,7 @@
-['ip']
-['app']
-['device']
-['os']
-['channel']
-['ip', 'app']
-['ip', 'device']
-['ip', 'os']
-['ip', 'channel']
-['app', 'device']
-['app', 'os']
-['app', 'channel']
-['ip', 'app', 'device']
-['ip', 'app', 'os']
-['ip', 'app', 'channel']
+start
+train done
+test rading done
+test done
+test old done
+saving
+done
