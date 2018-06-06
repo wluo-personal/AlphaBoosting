@@ -1,1 +1,7 @@
 start
+train done
+test rading done
+test done
+test old done
+saving
+done
