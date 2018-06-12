@@ -57,7 +57,7 @@ class Test(unittest.TestCase):
                            't':[0,1,2,3,4,5,6,7],
                            'label':[1,1,1,0,1,0,1,0]},
                            index=range(8))
-        returned = Feature.count_in_next_n_time_unit(df, cols=['a','t'], col_name='count_next_n', params={'n':'3'}).values
+        returned = Feature.count_in_next_n_time_unit(df, cols=['a','t'], col_name='count_next_n', params={'n':'3'})['count_next_n'].values
         self.assertEqual(list(returned), [0,3,2,2,1,1,0,0])       
         
 if __name__ == '__main__':
