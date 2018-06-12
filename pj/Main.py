@@ -525,7 +525,7 @@ class Feature:
         result = []
         bound = 0
         for cur in range(len(encodings)):
-            while times[cur] - times[bound] > n:
+            while abs(times[cur] - times[bound]) > n:
                 dict_count[encodings[bound]] -= 1
                 bound += 1
             result.append(dict_count[encodings[cur]])
@@ -559,16 +559,29 @@ class Feature:
         -------
         n=3
         
-        a t  returned
-        _____________
-        0 0  0
-        1 1  3
-        1 2  2
-        1 3  2
-        1 4  1
-        0 5  1
-        1 6  0
-        0 7  0        
+        df:
+            a	label	t
+        0	0	1	0
+        1	1	1	1
+        2	1	1	2
+        3	1	0	3
+        4	1	1	4
+        5	0	0	5
+        6	1	1	6
+        7	0	0	7    
+        
+        call: count_in_next_n_time_unit(df, cols=['a','t'], col_name='count_next_n', params={'n':'3'})
+        
+        returned:
+            count_next_n
+        0	0
+        1	3
+        2	2
+        3	2
+        4	1
+        5	1
+        6	0
+        7	0        
         
         See Also
         --------
