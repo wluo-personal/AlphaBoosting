@@ -1,4 +1,4 @@
-from .utils import FirstClass, ThirdClass
+from .utils import Utils, FirstClass, ThirdClass
 from .utils2 import SecondClass
 
 # Create the Logger
