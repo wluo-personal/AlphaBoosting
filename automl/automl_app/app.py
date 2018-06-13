@@ -1,70 +1,87 @@
-import os, json, gc
+import os, json, gc, logging, shutil
 import pandas as pd
 import numpy as np
 from automl_libs import Utils
 
 class AlphaBoosting:
-    def __init__(self, root=None, train_csv_url=None, test_csv_url=None, validation_index=None, func_map=None, timestamp=None,
-                 label=None, categorical_features=None, numerical_features=None, validation_ratio=0.1, ngram=(1,1),
-                 downsampling=1, down_sampling_ratio=None, run_record='run_record.json'):
+    def __init__(self, config_file, func_map, run_record='run_record.json'):
+        """
+        down_sampling_amt: int, default=1, how many different downsamplings need to be generated
+                      e.g. combine the same positive samples with different negative samples
+                      will result in a different downsampling (assume more neg samples the pos ones)
+                      
+        """
+        self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
+
+        if config_file is None:
+            raise Exception('config file can not be None')
+            if not os.path.exists(config_file):
+                raise Exception('config file can not be found')
+               
+        # 1. run_record need to to provides so that the previous run(if there is one) info can
+        # be loaded, which will determine what need to be rerun and what don't
+        # 2. don't create this file or modify this file
+        if run_record is None:
+            raise Exception('run record file can not be None')
+            
+        self.func_map = func_map
+               
+        config_dict = json.load(open(config_file, 'r'))
+        self.ROOT = config_dict['root']
+        self.OUTDIR = config_dict['root'] + 'output/'
+        self.LOGDIR = config_dict['root'] + 'log/'
+        self.DATADIR = config_dict['root'] + 'data/'
+        self.train_csv_url = config_dict['train_csv_url']
+        self.test_csv_url = config_dict['test_csv_url']
+        self.label = config_dict['label']
+        self.down_sampling_amt = config_dict['down_sampling_amt']
+        self.down_sampling_ratio = config_dict['down_sampling_ratio'] 
+        
+        # read data and determine validation set
+        self._read_data()
+        if config_dict['validation_index'] is not None:
+            self.validation_index = json.load(open(config_dict['validation_index']))
+            self.validation_ratio = None # means the 'ratio' param is overruled
+        else:
+            try:
+                val_ratio = config_dict['validation_ratio']
+            except KeyError:
+                raise ValueError('since validation_index is null in config file, validation_ratio must be provided')
+            self.validation_ratio = val_ratio
+            self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
+            
+                
+            
         downsampling_amount_changed = False
         down_sampling_ratio_changed = False
         val_index_changed = False
-        if run_record == None:
-            raise Exception('run record file can not be None')
         
-        self.func_map = func_map
+        
         if not os.path.exists(run_record):
-            # set run record 
-            print('First time running...')
-            self.ROOT = root
-            self.OUTDIR = root + 'output/'
-            self.LOGDIR = root + 'log/'
-            self.DATADIR = root + 'data/'
-            self.train_csv_url = train_csv_url
-            self.test_csv_url = test_csv_url
-            self.timestamp = timestamp
-            self.label = label
-            self.categorical_features = categorical_features
-            self.numerical_features = numerical_features
-            self.downsampling = downsampling
-            self.down_sampling_ratio = down_sampling_ratio 
-            # read data
-            self._read_data()
-            if validation_index == None:
-                self.validation_index = list(range(int(self.train_len*(1-validation_ratio)), self.train_len))
-            else:
-                self.validation_index = validation_index
+            self.logger.info('Run record file [{}] not found. Begin the first time run...'.format(run_record))
         else:
-            print('Continue from the previous run...')
-            with open(run_record, 'r') as infile: file = json.load(infile)
-            self.ROOT = file['root']
-            self.OUTDIR = file['root'] + 'output/'
-            self.LOGDIR = file['root'] + 'log/'
-            self.DATADIR = file['root'] + 'data/'
-            self.train_csv_url = file['train_csv_url']
-            self.test_csv_url = file['test_csv_url']
-            # read data
-            self._read_data()
-            self.timestamp = file['timestamp']
-            self.label = file['label']
-            self.categorical_features = file['categorical_features']
-            self.numerical_features = file['numerical_features']
-            self.validation_index = json.load(open(file['validation_index']))
-            self.downsampling = file['downsampling']
-            self.down_sampling_ratio = file['down_sampling_ratio'] 
+            self.logger.info('Run record file [{}] found. Continue from the previous run...'.format(run_record))
+            with open(run_record, 'r') as f: run_record_dict = json.load(f)
             
             # check if validation and down sampling need to be redone
-            old_down_sampling = self.downsampling
-            if downsampling != self.downsampling:
+            prev_down_sampling_amt = run_record_dict['down_sampling_amt']
+            if prev_down_sampling_amt != self.down_sampling_amt:
+                self.logger.debug('Down sampling amount: previous: {}. new: {}'
+                                  .format(prev_down_sampling_amt, self.down_sampling_amt))
                 downsampling_amount_changed = True
-                self.downsampling = downsampling
-            if down_sampling_ratio != None and self.down_sampling_ratio != down_sampling_ratio:
+            
+            prev_down_sampling_ratio = run_record_dict['down_sampling_ratio']
+            if self.down_sampling_ratio != prev_down_sampling_ratio:
+                self.logger.debug('Down sampling ratio: previous: {}. new: {}'
+                                  .format(prev_down_sampling_ratio, self.down_sampling_ratio))
                 down_sampling_ratio_changed = True
-                self.down_sampling_ratio = down_sampling_ratio
-            if validation_index != None and self.validation_index != validation_index:
+                
+            prev_validation_index = json.load(open(run_record_dict['validation_index']))
+            if self.validation_index != prev_validation_index:
+                self.logger.debug('Validation index: previous: {}... new: {}...'
+                                  .format(prev_validation_index[:3], self.validation_index[:3]))
                 val_index_changed = True
-                self.validation_index = validation_index
+                
         
         # build relavent directories
         self.FEATUREDIR = self.DATADIR + 'features/'
@@ -88,7 +105,7 @@ class AlphaBoosting:
             
             if os.path.exists(self.LOGDIR + 'down_sampling_idx.json'): os.remove(self.LOGDIR + 'down_sampling_idx.json')
             if os.path.exists(self.LOGDIR + 'val.pkl'): os.remove(self.DATADIR + 'val.pkl')
-            for i in range(old_down_sampling): 
+            for i in range(prev_down_sampling_amt): 
                 if os.path.exists(self.DATADIR + str(i) + '.pkl'):
                     os.remove(self.DATADIR + str(i) + '.pkl')
             shutil.rmtree(self.DATADIR + 'split/')
@@ -126,22 +143,23 @@ class AlphaBoosting:
 
             
     def _save_run_record(self, url):
-        val_index_url = self.LOGDIR + 'val_index.json'
-        d = {
+        run_record = {
             'root':                 self.ROOT,
             'train_csv_url':        self.train_csv_url,
             'test_csv_url':         self.test_csv_url,
-            'timestamp':            self.timestamp,
             'label':                self.label,
-            'categorical_features': self.categorical_features,
-            'numerical_features':   self.numerical_features,
-            'validation_index':     val_index_url, 
-            'downsampling':         self.downsampling,
+            'down_sampling_amt':    self.down_sampling_amt,
             'down_sampling_ratio':  self.down_sampling_ratio
         }
+        if self.validation_ratio is not None: # means param: [validation_ratio] is not overruled by param [validation_index]
+            run_record['validation_ratio'] = self.validation_ratio
+            
+        val_index_url = self.LOGDIR + 'val_index.json'
+        run_record['validation_index'] = val_index_url 
         with open(val_index_url, 'w') as f: json.dump(self.validation_index, f, indent=4, sort_keys=True)
-        with open(url, 'w') as f: json.dump(d, f, indent=4, sort_keys=True)
-        del d
+            
+        with open(url, 'w') as f: json.dump(run_record, f, indent=4, sort_keys=True)
+        del run_record 
         gc.collect()
             
     def _get_file_concat(self, base_df, split_folder, concat_folder, is_train, file_name_body):
@@ -169,8 +187,8 @@ class AlphaBoosting:
                 dictionary = json.load(file)
         else:
             dictionary = {'feature_engineering':           False, 
-                          'val_downsample_generate_index': self.downsampling==0,
-                          'val_downsample_split':          self.downsampling==0,
+                          'val_downsample_generate_index': self.down_sampling_amt==0,
+                          'val_downsample_split':          self.down_sampling_amt==0,
                           'val_downsample_generation':     False,
                           'concat_test':                   False,
                           'grid_search':                   False}
@@ -198,7 +216,7 @@ class AlphaBoosting:
             down_sampling_url = self.DATADIR + 'split/'
             if not os.path.exists(down_sampling_url): os.makedirs(down_sampling_url)
             index.extend(self._generate_down_sampling_index_file(dictionary['val_downsample_generate_index']))
-            for i in range(self.downsampling): 
+            for i in range(self.down_sampling_amt): 
                 split_folder.append(down_sampling_url+str(i)+'/')
                 if not os.path.exists(split_folder[-1]): os.makedirs(split_folder[-1])
 
@@ -226,7 +244,7 @@ class AlphaBoosting:
         
         # concat files
         if not dictionary['val_downsample_generation']:
-            if self.downsampling == 0:
+            if self.down_sampling_amt == 0:
                 index.append(sorted(list(set(range(self.train_len)).difference(set(self.validation_index)))))
                 split_folder.append(self.FEATUREDIR)
             for i in range(len(split_folder)):
@@ -437,7 +455,7 @@ class AlphaBoosting:
             positive = list(train_exclude_val[train_exclude_val[self.label]==1].index.values)
             negative = list(train_exclude_val[train_exclude_val[self.label]==0].index.values)
             ratio = len(positive) / len(negative) if self.down_sampling_ratio == None else self.down_sampling_ratio 
-            for i in range(self.downsampling): index.append(_downsampling(positive, negative, ratio))
+            for i in range(self.down_sampling_amt): index.append(_downsampling(positive, negative, ratio))
             del train_exclude_val
             gc.collect()
             with open(self.LOGDIR + 'down_sampling_idx.json', 'w') as file:

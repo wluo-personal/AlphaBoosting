@@ -55,7 +55,6 @@ def count(df=None, cols=None, col_name=None, params=None):
     --------
     Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
     """    
-    module_logger.info('Begin to generate: {}'.format(col_name))
     r_col = params['col']
     dtype = {x: df[x].dtype for x in cols if x in df.columns.values}
     d_cols = list(cols)
@@ -66,7 +65,7 @@ def count(df=None, cols=None, col_name=None, params=None):
     r = _df[[col_name]].copy()
     del _df, result, d_cols, dtype
     gc.collect()
-    module_logger.info('Done generating: {}'.format(col_name))
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
 
 def unique_count(df=None, cols=None, col_name=None, params=None):
@@ -131,6 +130,7 @@ def unique_count(df=None, cols=None, col_name=None, params=None):
     r = _df[[col_name]].copy()
     del _df, result, dtype
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
 
 def cumulative_count(df=None, cols=None, col_name=None, params=None):
@@ -186,6 +186,7 @@ def cumulative_count(df=None, cols=None, col_name=None, params=None):
     r = r.to_frame()
     del result
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
 
 def reverse_cumulative_count(df=None, cols=None, col_name=None, params=None):
@@ -242,6 +243,7 @@ def reverse_cumulative_count(df=None, cols=None, col_name=None, params=None):
     r.sort_index(inplace=True)
     del result
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
 
 def variance(df=None, cols=None, col_name=None, params=None):
@@ -276,6 +278,7 @@ def variance(df=None, cols=None, col_name=None, params=None):
     r = _df[[col_name]].copy()
     del dtype, _df, group
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
 
 # params['col'] = : additional col to help count
@@ -321,6 +324,7 @@ def count_std_over_mean(df=None, cols=None, col_name=None, params=None):
     r = _df[[col_name]].copy()
     del d_cols, group, result, _df
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
 
 
@@ -397,6 +401,7 @@ def time_to_n_next(df=None, cols=None, col_name=None, params=None):
     result = result.astype(Utils._set_type(result, 'uint')).to_frame()
     del n, m
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return result
 
 # params['n']: n, cols[-1]: time
@@ -473,6 +478,7 @@ def count_in_previous_n_time_unit(df=None, cols=None, col_name=None, params=None
     r = pd.DataFrame(result, columns=[col_name], dtype=Utils._set_type(result, 'uint'))
     del encodings, times, dict_count, result, bound, n
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
 
 # cols[-1]: time
@@ -532,4 +538,5 @@ def count_in_next_n_time_unit(df=None, cols=None, col_name=None, params=None):
     r = fe.count_in_previous_n_time_unit(df.sort_index(ascending=False), cols, col_name, params)
     r = r.reindex(index=r.index[::-1]).reset_index(drop=True)
     gc.collect()
+    module_logger.debug('feature generated: {}'.format(col_name))
     return r
