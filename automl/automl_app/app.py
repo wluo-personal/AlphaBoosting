@@ -3,14 +3,10 @@ import pandas as pd
 import numpy as np
 from automl_libs import Utils
 
+import pdb
+    
 class AlphaBoosting:
     def __init__(self, config_file, func_map, run_record='run_record.json'):
-        """
-        down_sampling_amt: int, default=1, how many different downsamplings need to be generated
-                      e.g. combine the same positive samples with different negative samples
-                      will result in a different downsampling (assume more neg samples the pos ones)
-                      
-        """
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
 
         if config_file is None:
@@ -124,7 +120,7 @@ class AlphaBoosting:
         
         # grid search
         print('grid search')
-        self._grid_search(dictionary)
+        self._grid_search(dictionary, config_file)
     
     
     ######### util functions #########
@@ -186,12 +182,14 @@ class AlphaBoosting:
             with open(self.LOGDIR + 'todo_list.json', 'r') as file:
                 dictionary = json.load(file)
         else:
-            dictionary = {'feature_engineering':           False, 
-                          'val_downsample_generate_index': self.down_sampling_amt==0,
-                          'val_downsample_split':          self.down_sampling_amt==0,
-                          'val_downsample_generation':     False,
-                          'concat_test':                   False,
-                          'grid_search':                   False}
+            dictionary = {
+                'feature_engineering':           False, 
+                'val_downsample_generate_index': False,
+                'val_downsample_split':          False,
+                'val_downsample_generation':     False,
+                'concat_test':                   False,
+                'grid_search':                   False
+            }
             with open(self.LOGDIR + 'todo_list.json', 'w') as file: 
                 json.dump(dictionary, file, indent=4, sort_keys=True)
         return dictionary
@@ -212,13 +210,14 @@ class AlphaBoosting:
         index = []
         down_sampling_url = None
         if not dictionary['val_downsample_generation']:
-            # down sampling
-            down_sampling_url = self.DATADIR + 'split/'
-            if not os.path.exists(down_sampling_url): os.makedirs(down_sampling_url)
-            index.extend(self._generate_down_sampling_index_file(dictionary['val_downsample_generate_index']))
-            for i in range(self.down_sampling_amt): 
-                split_folder.append(down_sampling_url+str(i)+'/')
-                if not os.path.exists(split_folder[-1]): os.makedirs(split_folder[-1])
+            if self.down_sampling_amt != 0:
+                # down sampling
+                down_sampling_url = self.DATADIR + 'split/'
+                if not os.path.exists(down_sampling_url): os.makedirs(down_sampling_url)
+                index.extend(self._generate_down_sampling_index_file(dictionary['val_downsample_generate_index']))
+                for i in range(self.down_sampling_amt): 
+                    split_folder.append(down_sampling_url+str(i)+'/')
+                    if not os.path.exists(split_folder[-1]): os.makedirs(split_folder[-1])
 
             # validation
             split_folder.append(self.DATADIR + 'split/val/')
@@ -248,7 +247,7 @@ class AlphaBoosting:
                 index.append(sorted(list(set(range(self.train_len)).difference(set(self.validation_index)))))
                 split_folder.append(self.FEATUREDIR)
             for i in range(len(split_folder)):
-                file_name_body = 'val' if split_folder[i] == self.FEATUREDIR else split_folder[i].split('/')[-2]
+                file_name_body = 'train' if split_folder[i] == self.FEATUREDIR else split_folder[i].split('/')[-2]
                 self._get_file_concat(base_df=self.train.loc[index[i]].copy().reset_index(drop=True),
                                       split_folder=split_folder[i], 
                                       concat_folder=self.DATADIR, 
@@ -257,17 +256,28 @@ class AlphaBoosting:
             self._renew_status(dictionary, 'val_downsample_generation', self.LOGDIR + 'todo_list.json')
         
     
-    def _grid_search(self, dictionary):
+    def _grid_search(self, dictionary, config_file):
         if not dictionary['grid_search']:
-            train = pd.read_pickle('data/0.pkl')
-            val = pd.read_pickle('data/val.pkl')
-            test = pd.read_pickle('data/test.pkl')
+            if self.down_sampling_amt == 0:
+                train = pd.read_pickle(self.DATADIR+'train.pkl')
+            else:
+                train = pd.read_pickle(self.DATADIR+'0.pkl')
+            val = pd.read_pickle(self.DATADIR+'val.pkl')
+            test = pd.read_pickle(self.DATADIR+'test.pkl')
+            
+            config_dict = json.load(open(config_file, 'r'))
+            categorical_features = config_dict['categorical_features']
+            not_features = config_dict['not_features']
+            label_col = config_dict['label']
+            feature_cols = list(set(train.columns) - set(not_features) - set(label_col))
+            
+            pdb.set_trace()
 #             feature_cols = train.columns - label - not_feature_cols
 #             label =
 #             X_train = train[feature_cols]
 #             y_train = train[label]
 #             self._lgb_grid_search()
-        self._renew_status(dictionary, 'grid_search', self.LOGDIR + 'todo_list.json')
+        #self._renew_status(dictionary, 'grid_search', self.LOGDIR + 'todo_list.json')
     
     def _lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_rounds, 
                         filename_for_gs_results, metric='auc', cv=False, nfold=5, 
