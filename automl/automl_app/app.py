@@ -441,11 +441,14 @@ class AlphaBoosting:
         func = line.get('function')
         #feature_cols = '_'.join(line.get('feature_cols'))
         feature_cols = line.get('feature_cols')
+        params = line.get('params')
         generated_feature_name = '__'.join([func, '_'.join(feature_cols)])
-        if line.get('params') != None: generated_feature_name += '__' + '_'.join(map(str, line.get('params').values()))
+        if line.get('params') != None: generated_feature_name += '__' + '_'.join(map(str, params.values()))
+        params['train_len'] = self.train_len
         if not os.path.exists(self.FEATUREDIR + generated_feature_name + '.pkl'):
-            _df = f_map[func](df=self.df[feature_cols+[self.label]], cols=line.get('feature_cols'), dummy_col=self.label,
-                              generated_feature_name=generated_feature_name, params=line.get('params'))
+            #TODO: test if passing df=df[feature_cols+[self.label]] can save memory
+            _df = f_map[func](df=self.df, cols=line.get('feature_cols'), dummy_col=self.label,
+                              generated_feature_name=generated_feature_name, params=params)
             utils.save(df=_df, train_len=self.train_len, url=self.FEATUREDIR, name=generated_feature_name)
     
     # concat test
