@@ -1,5 +1,5 @@
 from collections import defaultdict
-from automl_libs import Utils
+from automl_libs import utils
 from automl_libs import feature_engineering as fe
 import pandas as pd
 import logging, gc
@@ -50,14 +50,14 @@ def count(df, cols, dummy_col, generated_feature_name, params=None):
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
     """    
     r_col = dummy_col
     dtype = {x: df[x].dtype for x in cols if x in df.columns.values}
     d_cols = list(cols)
     d_cols.append(r_col)
     result = df[d_cols].groupby(by=cols)[[r_col]].count().rename(index=str, columns={r_col: generated_feature_name}).reset_index()
-    dtype[generated_feature_name] = Utils._set_type(result[generated_feature_name], 'uint')
+    dtype[generated_feature_name] = utils.set_type(result[generated_feature_name], 'uint')
     _df = df.merge(result.astype(dtype), on=cols, how='left')
     r = _df[[generated_feature_name]].copy()
     del _df, result, d_cols, dtype
@@ -112,7 +112,7 @@ def unique_count(df, cols, dummy_col, generated_feature_name, params=None):
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
 
     Notes
     -----
@@ -120,7 +120,7 @@ def unique_count(df, cols, dummy_col, generated_feature_name, params=None):
     r_col = cols[-1]
     dtype = {x: df[x].dtype for x in cols[:-1] if x in df.columns.values}
     result = df[cols].groupby(by=cols[:-1])[[r_col]].nunique().rename(index=str, columns={r_col: generated_feature_name}).reset_index()
-    dtype[generated_feature_name] = Utils._set_type(result[generated_feature_name], 'uint')
+    dtype[generated_feature_name] = utils.set_type(result[generated_feature_name], 'uint')
     _df = df.merge(result.astype(dtype), on=cols[:-1], how='left')
     r = _df[[generated_feature_name]].copy()
     del _df, result, dtype
@@ -171,11 +171,11 @@ def cumulative_count(df, cols, dummy_col, generated_feature_name, params=None):
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
     reversed_cumulative_count : reversed version
     """
     result = df[cols].groupby(by=cols).cumcount().rename(generated_feature_name)
-    r = result.astype(Utils._set_type(result, 'uint'))
+    r = result.astype(utils.set_type(result, 'uint'))
     r = r.to_frame()
     del result
     gc.collect()
@@ -228,11 +228,11 @@ def reverse_cumulative_count(df, cols, dummy_col, generated_feature_name, params
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
     cumulative_count : unreversed version
     """        
     result = df.sort_index(ascending=False)[cols].groupby(cols).cumcount().rename(generated_feature_name)
-    r = result.astype(Utils._set_type(result, 'uint')).to_frame()
+    r = result.astype(utils.set_type(result, 'uint')).to_frame()
     r.sort_index(inplace=True)
     del result
     gc.collect()
@@ -260,13 +260,13 @@ def variance(df, cols, dummy_col, generated_feature_name, params=None):
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
     """ 
     group_cols = cols[:-1]
     calc_col = cols[-1]
     group = df[cols].groupby(by=group_cols)[[calc_col]].var().reset_index().rename(index=str, columns={calc_col: generated_feature_name}).fillna(0)
     dtype = {x: df[x].dtype for x in group_cols if x in df.columns.values}
-    dtype[generated_feature_name] = Utils._set_type(group[generated_feature_name], 'float')
+    dtype[generated_feature_name] = utils.set_type(group[generated_feature_name], 'float')
     _df = df.merge(group.astype(dtype), on=group_cols, how='left')
     r = _df[[generated_feature_name]].copy()
     del dtype, _df, group
@@ -300,7 +300,7 @@ def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
     """ 
     group_cols = cols[:-1]
     calc_col = cols[-1]
@@ -310,7 +310,7 @@ def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None
     result = group.groupby(by=group_cols)[['count']].agg(['mean','std'])['count'].reset_index()
     result[generated_feature_name] = ((int(params['coefficient']) * result['std']) / result['mean']).fillna(-1)
     dtype = {x: df[x].dtype for x in group_cols if x in df.columns.values}
-    dtype[generated_feature_name] = Utils._set_type(result[generated_feature_name], 'float')
+    dtype[generated_feature_name] = utils.set_type(result[generated_feature_name], 'float')
     _df = df.merge(result.astype(dtype), on=group_cols, how='left')
     r = _df[[generated_feature_name]].copy()
     del d_cols, group, result, _df
@@ -378,7 +378,7 @@ def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
 
     Note
     -----
@@ -389,7 +389,7 @@ def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
     n = int(params['n'])
     m = int(params['fillna'])
     result = (df[cols].groupby(by=group_cols)[calc_col].shift(-n) - df[calc_col]).fillna(m)
-    result = result.astype(Utils._set_type(result, 'uint')).to_frame()
+    result = result.astype(utils.set_type(result, 'uint')).to_frame()
     del n, m
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
@@ -445,7 +445,7 @@ def count_in_previous_n_time_unit(df, cols, dummy_col, generated_feature_name, p
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
     count_in_next_n_time_unit : counts the occurrences of specific values with in the time n after the current time.
     """        
     group_cols = cols[:-1]
@@ -466,7 +466,7 @@ def count_in_previous_n_time_unit(df, cols, dummy_col, generated_feature_name, p
             bound += 1
         result.append(dict_count[encodings[cur]])
         dict_count[encodings[cur]] += 1
-    r = pd.DataFrame(result, columns=[generated_feature_name], dtype=Utils._set_type(result, 'uint'))
+    r = pd.DataFrame(result, columns=[generated_feature_name], dtype=utils.set_type(result, 'uint'))
     del encodings, times, dict_count, result, bound, n
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
@@ -522,7 +522,7 @@ def count_in_next_n_time_unit(df, cols, dummy_col, generated_feature_name, param
 
     See Also
     --------
-    Utils._set_type : This is used to set suited data type to the column of dataframe that will be returned.
+    utils.set_type : This is used to set suited data type to the column of dataframe that will be returned.
     count_in_previous_n_time_unit : 
         counts the occurrences of specific values with in the time n before the current time.
     """          

@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from automl_libs import Utils
+from automl_libs import utils
 import logging, gc
 module_logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def _woe(df=None, group_cols=None, label=None, col_name=None, params=None):
     negative = df.shape[0] - positive
     group[col_name] = np.log((group['sum']+0.5) / positive / ((group['count']-group['sum']+0.5) / negative))
     dtype = {x: df[x].dtype for x in group_cols if x in df.columns.values}
-    dtype[col_name] = Utils._set_type(group[col_name], 'float')
+    dtype[col_name] = utils.set_type(group[col_name], 'float')
     group.astype(dtype)
     return_cols = list(group_cols)
     return_cols.append(col_name)
@@ -90,7 +90,7 @@ def _chi_square(df=None, group_cols=None, label=None, col_name=None, params=None
                           (group['n21'] - group['e21']) ** 2 / group['e21'] + \
                           (group['n22'] - group['e22']) ** 2 / group['e22']
     dtype = {x: df[x].dtype for x in group_cols if x in df.columns.values}
-    dtype[col_name] = Utils._set_type(group[col_name], 'float')
+    dtype[col_name] = utils.set_type(group[col_name], 'float')
     group.astype(dtype)
     return_cols = list(group_cols)
     return_cols.append(col_name)
@@ -101,6 +101,6 @@ def _chi_square(df=None, group_cols=None, label=None, col_name=None, params=None
 
 def _mean(df=None, group_cols=None, label=None, col_name=None, params=None):
     r = df.groupby(by=group_cols)[[label]].mean().reset_index().rename(index=str, columns={label:col_name})
-    r.astype(Utils._set_type(r[col_name], 'float'))
+    r.astype(utils.set_type(r[col_name], 'float'))
     gc.collect()
     return r
