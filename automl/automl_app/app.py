@@ -6,7 +6,7 @@ from automl_libs import Utils
 import pdb
     
 class AlphaBoosting:
-    def __init__(self, config_file, func_map, run_record='run_record.json'):
+    def __init__(self, config_file, func_map, feature_engineering_dict, run_record='run_record.json'):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
 
         if config_file is None:
@@ -21,6 +21,7 @@ class AlphaBoosting:
             raise Exception('run record file can not be None')
             
         self.func_map = func_map
+        self.feature_engineering_dict = feature_engineering_dict
                
         config_dict = json.load(open(config_file, 'r'))
         self.ROOT = config_dict['root']
@@ -196,9 +197,10 @@ class AlphaBoosting:
     
     def _feature_engineering(self, dictionary):
         feature_engineering_file_url = self.LOGDIR + 'feature_engineering.json'
+        pdb.set_trace()
         if not dictionary['feature_engineering']:
             if not os.path.exists(feature_engineering_file_url):
-                self._generate_feature_engineering_file(feature_engineering_file_url)
+                self._generate_feature_engineering_file(feature_engineering_file_url, self.feature_engineering_dict)
             with open(feature_engineering_file_url, 'r') as file:
                 data = json.load(file)
                 for line in data:
@@ -270,16 +272,21 @@ class AlphaBoosting:
             not_features = config_dict['not_features']
             label_col = config_dict['label']
             feature_cols = list(set(train.columns) - set(not_features) - set(label_col))
+            gs_search_file = config_dict['grid_search_records_file']
+            
+            X_train = train[feature_cols]
+            y_train = train[label_col]
+            X_val = val[feature_cols]
+            y_val = val[label_col]
             
             pdb.set_trace()
-#             feature_cols = train.columns - label - not_feature_cols
-#             label =
-#             X_train = train[feature_cols]
-#             y_train = train[label]
-#             self._lgb_grid_search()
+            self._lgb_grid_search(X_train, y_train, X_val, y_val,
+                                 categorical_features, search_rounds=2, 
+                                 filename_for_gs_results=gs_search_file, 
+                                 verbose_eval=1)
         #self._renew_status(dictionary, 'grid_search', self.LOGDIR + 'todo_list.json')
     
-    def _lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_rounds, 
+    def _lgb_grid_search(self, X_train, y_train, X_val, y_val, categorical_feature, search_rounds, 
                         filename_for_gs_results, metric='auc', cv=False, nfold=5, 
                         verbose_eval=50, X_test=None, preds_save_path=None):
         import time
@@ -400,27 +407,9 @@ class AlphaBoosting:
                 
     ######### support functions #########
     # feature engineering
-    def _generate_feature_engineering_file(self, feature_engineering_file_url):
+    def _generate_feature_engineering_file(self, feature_engineering_file_url, feature_engineering_dict):
         with open(feature_engineering_file_url, 'w') as file:
-            dictionary = []
-            
-            # params
-            param = {'trainLen': self.train_len, 'splitCol': 'a', 'col': self.label, 'coefficient': 10, 'n': 2, 'fillna': 22}
-            
-            dictionary.append({'params': param, 'function': 'count', 'feature_cols': ['a','b']})
-            dictionary.append({'params': param, 'function': 'unique_count', 'feature_cols': ['a','b']})
-            dictionary.append({'params': param, 'function': 'cumulative_count', 'feature_cols': ['a','b']})
-            dictionary.append({'params': param, 'function': 'reverse_cumulative_count', 'feature_cols': ['a','b']})
-            dictionary.append({'params': param, 'function': 'variance', 'feature_cols': ['a','n']})
-            dictionary.append({'params': param, 'function': 'count_std_over_mean', 'feature_cols': ['a','b']})
-            dictionary.append({'params': param, 'function': 'time_to_n_next', 'feature_cols': ['a','t']})
-            dictionary.append({'params': param, 'function': 'count_in_previous_n_time_unit', 'feature_cols': ['a','t']})
-            dictionary.append({'params': param, 'function': 'count_in_next_n_time_unit', 'feature_cols': ['a','t']})
-            dictionary.append({'params': param, 'function': 'woe', 'feature_cols': ['b']})
-            dictionary.append({'params': param, 'function': 'chi_square', 'feature_cols': ['b']})
-            dictionary.append({'params': param, 'function': 'mean', 'feature_cols': ['b']})
-            
-            json.dump(dictionary, file, indent=4, sort_keys=True)
+            json.dump(feature_engineering_dict, file, indent=4, sort_keys=True)
     
     # create a feature
     """ 
@@ -430,13 +419,35 @@ class AlphaBoosting:
                 test__<function_name>__<feature_combination_name>__<possible_param>.pkl
     """
     def _add_column(self, line, f_map):
-        fun = line.get('function')
-        feature = '_'.join(line.get('feature_cols'))
-        col_name = '__'.join([fun, feature])
-        if line.get('params') != None: col_name += '__' + '_'.join(map(str, line.get('params').values()))
-        if not os.path.exists(self.FEATUREDIR + col_name + '.pkl'):
-            _df = f_map[fun](df=self.df, cols=line.get('feature_cols'), col_name=col_name, params=line.get('params'))
-            Utils.save(df=_df, train_len=self.train_len, url=self.FEATUREDIR, name=col_name)
+        """
+        line: dict
+            e.g:
+            _____
+            {
+                "feature_cols": [
+                    "a",
+                    "b"
+                ],
+                "function": "count",
+                "params": {
+                    "coefficient": 10,
+                    "col": "l",
+                    "fillna": 22,
+                    "n": 2,
+                    "splitCol": "a",
+                    "trainLen": 18
+                }
+            }
+        """
+        func = line.get('function')
+        #feature_cols = '_'.join(line.get('feature_cols'))
+        feature_cols = line.get('feature_cols')
+        generated_feature_name = '__'.join([func, '_'.join(feature_cols)])
+        if line.get('params') != None: generated_feature_name += '__' + '_'.join(map(str, line.get('params').values()))
+        if not os.path.exists(self.FEATUREDIR + generated_feature_name + '.pkl'):
+            _df = f_map[func](df=self.df[feature_cols+[self.label]], cols=line.get('feature_cols'), dummy_col=self.label,
+                              generated_feature_name=generated_feature_name, params=line.get('params'))
+            Utils.save(df=_df, train_len=self.train_len, url=self.FEATUREDIR, name=generated_feature_name)
     
     # concat test
     def _concat_test(self, dictionary):
