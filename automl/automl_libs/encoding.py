@@ -32,13 +32,13 @@ def _wrapper(df, cols, dummy_col, generated_feature_name, params=None):
     train = df[ : params['train_len']]
     test = df[params['train_len']:]
     return pd.concat([_train_wrapper(df[:params['train_len']],\
-                                                      cols, dummy_col,\
-                                                      generated_feature_name, params['function'],\
-                                                      params['split_col']),\
+                                      cols, dummy_col,\
+                                      generated_feature_name, params['function'],\
+                                      params['split_col']),\
                       _testset_wrapper(df[:params['train_len']],\
-                                                     df[params['train_len']:],\
-                                                     cols, dummy_col,\
-                                                     generated_feature_name, params['function'])],\
+                                     df[params['train_len']:],\
+                                     cols, dummy_col,\
+                                     generated_feature_name, params['function'])],\
                      ignore_index=True)
 
 def _train_wrapper(df, group_cols, label, generated_feature_name, func, split_col):

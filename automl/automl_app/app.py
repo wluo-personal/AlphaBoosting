@@ -6,42 +6,40 @@ from automl_libs import utils
 import pdb
     
 class AlphaBoosting:
-    def __init__(self, config_file, func_map, feature_engineering_dict, run_record='run_record.json'):
+    def __init__(self, config_file, features_to_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
 
         if config_file is None:
             raise Exception('config file can not be None')
             if not os.path.exists(config_file):
                 raise Exception('config file can not be found')
+        self.config_dict = json.load(open(config_file, 'r'))
+        self.ROOT = self.config_dict['project_root']
                
         # 1. run_record need to to provides so that the previous run(if there is one) info can
         # be loaded, which will determine what need to be rerun and what don't
         # 2. don't create this file or modify this file
-        if run_record is None:
-            raise Exception('run record file can not be None')
+        run_record = self.ROOT + self.config_dict['run_record_filename']
             
-        self.func_map = func_map
-        self.feature_engineering_dict = feature_engineering_dict
+        self.features_to_gen = features_to_gen
                
-        config_dict = json.load(open(config_file, 'r'))
-        self.ROOT = config_dict['root']
-        self.OUTDIR = config_dict['root'] + 'output/'
-        self.LOGDIR = config_dict['root'] + 'log/'
-        self.DATADIR = config_dict['root'] + 'data/'
-        self.train_csv_url = config_dict['train_csv_url']
-        self.test_csv_url = config_dict['test_csv_url']
-        self.label = config_dict['label']
-        self.down_sampling_amt = config_dict['down_sampling_amt']
-        self.down_sampling_ratio = config_dict['down_sampling_ratio'] 
+        self.OUTDIR = self.config_dict['project_root'] + 'output/'
+        self.LOGDIR = self.config_dict['project_root'] + 'log/'
+        self.DATADIR = self.config_dict['project_root'] + 'data/'
+        self.train_data_url = self.config_dict['train_data_url']
+        self.test_data_url = self.config_dict['test_data_url']
+        self.label = self.config_dict['label']
+        self.down_sampling_amt = self.config_dict['down_sampling_amt']
+        self.down_sampling_ratio = self.config_dict['down_sampling_ratio'] 
         
         # read data and determine validation set
         self._read_data()
-        if config_dict['validation_index'] is not None:
-            self.validation_index = json.load(open(config_dict['validation_index']))
+        if self.config_dict['validation_index'] is not None:
+            self.validation_index = json.load(open(self.config_dict['validation_index']))
             self.validation_ratio = None # means the 'ratio' param is overruled
         else:
             try:
-                val_ratio = config_dict['validation_ratio']
+                val_ratio = self.config_dict['validation_ratio']
             except KeyError:
                 raise ValueError('since validation_index is null in config file, validation_ratio must be provided')
             self.validation_ratio = val_ratio
@@ -88,11 +86,11 @@ class AlphaBoosting:
         if not os.path.exists(self.FEATUREDIR): os.makedirs(self.FEATUREDIR)
             
         # save run_record:
-        print('save run record')
+        self.logger.info('save run record')
         self._save_run_record(run_record)
         
         # generate todo list: c
-        print('generate todo list')
+        self.logger.info('generate todo list')
         dictionary = self._generate_todo_list()
         
         if downsampling_amount_changed or down_sampling_ratio_changed or val_index_changed:
@@ -108,28 +106,26 @@ class AlphaBoosting:
             shutil.rmtree(self.DATADIR + 'split/')
         
         # feature engineering
-        print('feature engineering')
+        self.logger.info('feature engineering')
         self._feature_engineering(dictionary)
         
         # get validation
-        print('validation')
+        self.logger.info('validation')
         self._validation_and_down_sampling(dictionary)
         
         # concatenant test: c
-        print('concat test')
+        self.logger.info('concat test')
         self._concat_test(dictionary)
         
         # grid search
-        print('grid search')
-        self._grid_search(dictionary, config_file)
+        self.logger.info('grid search')
+        self._grid_search(dictionary)
     
     
     ######### util functions #########
     def _read_data(self):
-        self.train = pd.DataFrame()
-        self.test = pd.DataFrame()
-        if self.train_csv_url != None: self.train = pd.read_csv(self.train_csv_url)
-        if self.test_csv_url != None: self.test = pd.read_csv(self.test_csv_url)
+        self.train = pd.read_pickle(self.train_data_url)
+        self.test = pd.read_pickle(self.test_data_url)
         self.df = pd.concat([self.train, self.test], ignore_index=True)
         self.train_len = self.train.shape[0]
         
@@ -139,11 +135,11 @@ class AlphaBoosting:
             json.dump(dictionary, f, indent=4, sort_keys=True)
 
             
-    def _save_run_record(self, url):
+    def _save_run_record(self, run_record_url):
         run_record = {
-            'root':                 self.ROOT,
-            'train_csv_url':        self.train_csv_url,
-            'test_csv_url':         self.test_csv_url,
+            'project_root':         self.ROOT,
+            'train_data_url':       self.train_data_url,
+            'test_data_url':        self.test_data_url,
             'label':                self.label,
             'down_sampling_amt':    self.down_sampling_amt,
             'down_sampling_ratio':  self.down_sampling_ratio
@@ -155,7 +151,7 @@ class AlphaBoosting:
         run_record['validation_index'] = val_index_url 
         with open(val_index_url, 'w') as f: json.dump(self.validation_index, f, indent=4, sort_keys=True)
             
-        with open(url, 'w') as f: json.dump(run_record, f, indent=4, sort_keys=True)
+        with open(run_record_url, 'w') as f: json.dump(run_record, f, indent=4, sort_keys=True)
         del run_record 
         gc.collect()
             
@@ -198,12 +194,8 @@ class AlphaBoosting:
     def _feature_engineering(self, dictionary):
         feature_engineering_file_url = self.LOGDIR + 'feature_engineering.json'
         if not dictionary['feature_engineering']:
-            if not os.path.exists(feature_engineering_file_url):
-                self._generate_feature_engineering_file(feature_engineering_file_url, self.feature_engineering_dict)
-            with open(feature_engineering_file_url, 'r') as file:
-                data = json.load(file)
-                for line in data:
-                    self._add_column(line, self.func_map)
+            for feature_to_gen in self.features_to_gen:
+                self._add_column(feature_to_gen)
         self._renew_status(dictionary, 'feature_engineering', (self.LOGDIR + 'todo_list.json'))
     
     def _validation_and_down_sampling(self, dictionary):
@@ -257,7 +249,7 @@ class AlphaBoosting:
             self._renew_status(dictionary, 'val_downsample_generation', self.LOGDIR + 'todo_list.json')
         
     
-    def _grid_search(self, dictionary, config_file):
+    def _grid_search(self, dictionary):
         if not dictionary['grid_search']:
             if self.down_sampling_amt == 0:
                 train = pd.read_pickle(self.DATADIR+'train.pkl')
@@ -266,59 +258,42 @@ class AlphaBoosting:
             val = pd.read_pickle(self.DATADIR+'val.pkl')
             test = pd.read_pickle(self.DATADIR+'test.pkl')
             
-            config_dict = json.load(open(config_file, 'r'))
-            categorical_features = config_dict['categorical_features']
-            not_features = config_dict['not_features']
-            label_col = config_dict['label']
-            feature_cols = list(set(train.columns) - set(not_features) - set(label_col))
-            gs_search_file = config_dict['grid_search_records_file']
+            categorical_features = self.config_dict['categorical_features']
+            not_features = self.config_dict['not_features']
+            label_col = self.config_dict['label']
+            label_col_as_list=[label_col]
+            feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
+            
+            gs_record = self.ROOT + self.config_dict['gs_record_filename']
+            gs_search_rounds = self.config_dict['gs_search_rounds']
+            gs_metric = self.config_dict['gs_metric']
+            gs_cv = self.config_dict['gs_cv']
+            gs_nfold = self.config_dict['gs_nfold']
+            gs_verbose_eval = self.config_dict['gs_verbose_eval']
+            gs_do_preds = self.config_dict['gs_do_preds']
             
             X_train = train[feature_cols]
             y_train = train[label_col]
             X_val = val[feature_cols]
             y_val = val[label_col]
+            X_test = test[feature_cols]
             
-            pdb.set_trace()
             self._lgb_grid_search(X_train, y_train, X_val, y_val,
-                                 categorical_features, search_rounds=2, 
-                                 filename_for_gs_results=gs_search_file, 
-                                 verbose_eval=1)
+                                 categorical_features, search_rounds=gs_search_rounds, 
+                                 filename_for_gs_results=gs_record, metric=gs_metric,
+                                 cv=gs_cv, nfold=gs_nfold, verbose_eval=100,
+                                 do_preds=gs_do_preds, X_test=X_test, preds_save_path=self.OUTDIR+'gs_saved_preds/')
         #self._renew_status(dictionary, 'grid_search', self.LOGDIR + 'todo_list.json')
     
     def _lgb_grid_search(self, X_train, y_train, X_val, y_val, categorical_feature, search_rounds, 
-                        filename_for_gs_results, metric='auc', cv=False, nfold=5, 
-                        verbose_eval=50, X_test=None, preds_save_path=None):
+                        filename_for_gs_results, metric, cv, nfold, 
+                        verbose_eval, do_preds, X_test, preds_save_path):
         import time
         import lightgbm as lgb
         
-        def get_time(timezone='America/New_York', time_format='%Y-%m-%d %H:%M:%S'):
-            from datetime import datetime
-            from dateutil import tz
-
-            # METHOD 1: Hardcode zones:
-            from_zone = tz.gettz('UTC')
-            to_zone = tz.gettz(timezone)
-
-            utc = datetime.utcnow()
-
-            # Tell the datetime object that it's in UTC time zone since 
-            # datetime objects are 'naive' by default
-            utc = utc.replace(tzinfo=from_zone)
-
-            # Convert time zone
-            est = utc.astimezone(to_zone)
-
-            return est.strftime(time_format)
-    
-        if X_test is not None:
-            if preds_save_path is None:
-                preds_save_path = 'LGB_GS_SAVES/'
-                if not os.path.exists(preds_save_path):
-                    os.makedirs(preds_save_path)
-                print('No save path provides, {} will be used to save predictions'.format(preds_save_path))
-            else:
-                if not os.path.exists(preds_save_path):
-                    raise ValueError('{} path does not exist. Mission aborted.'.format())
+        if do_preds:
+            if not os.path.exists(preds_save_path):
+                os.makedirs(preds_save_path)
 
         for i in range(search_rounds):
             try:
@@ -334,7 +309,7 @@ class AlphaBoosting:
                 lgb_params = {
                     'objective': 'binary',
                     'boosting': 'gbdt',
-                    'num_rounds': 4000,
+                    'num_rounds': 40,
                     'learning_rate': np.random.choice([0.1,0.03,0.001]),
                     'num_leaves': np.random.choice([15,31,61,127]),
                     'num_threads': 4, # best speed: set to number of real cpu cores, which is vCPU/2
@@ -342,7 +317,7 @@ class AlphaBoosting:
                     'min_data_in_leaf': np.random.randint(20,50),  #minimal number of data in one leaf. 
                     'feature_fraction': np.random.randint(3,11)/10,
                     'feature_fraction_seed': seed,
-                    'early_stopping_round':70,
+                    'early_stopping_round':1,
                     'bagging_freq': 1, #0 means disable bagging. k: perform bagging at every k iteration
                     'bagging_fraction': np.random.randint(3,11)/10, #Randomly select part of data 
                     'bagging_seed': seed,
@@ -353,7 +328,7 @@ class AlphaBoosting:
     #             pp = pprint.PrettyPrinter(indent=4)
     #             pp.pprint(lgb_params)
 
-                lgb_params['timestamp'] = get_time()
+                lgb_params['timestamp'] = utils.get_time()
                 if cv:
                     eval_hist = lgb.cv(lgb_params, lgb_train, nfold=nfold, 
                                        categorical_feature=categorical_feature, verbose_eval=verbose_eval, seed=seed)
@@ -368,8 +343,8 @@ class AlphaBoosting:
                     lgb_params['train_'+metric] = model.best_score['training'][metric]
 
 
-                if X_test is not None:
-                    print('X_test is not None, generating predictions ...')
+                if do_preds:
+                    self.logger.debug('[do_preds] is True, generating predictions ...')
                     if cv:
                         lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
                         model = lgb.train(lgb_params, lgb_train, valid_sets=lgb_train, 
@@ -377,39 +352,34 @@ class AlphaBoosting:
                     y_test = model.predict(X_test)
                     np.save(preds_save_path+'preds_{}'.format(run_id),  y_test)
                     lgb_params['preds'] = run_id 
-                    print('Predictions({}) saved in {}.'.format(run_id, preds_save_path))
+                    self.logger.debug('Predictions({}) saved in {}.'.format(run_id, preds_save_path))
 
 
                 for k, v in lgb_params.items():
                     if isinstance(v, list):
                         lgb_params[k] = '"'+str(v)+'"'
-                        print(lgb_params[k])
+                        self.logger.debug(lgb_params[k])
 
                 res = pd.DataFrame(lgb_params, index=[run_id])
 
                 if not os.path.exists(filename_for_gs_results):
                     res.to_csv(filename_for_gs_results)
-                    print(filename_for_gs_results, 'created')
+                    self.logger.debug(filename_for_gs_results + ' created')
                 else:
                     old_res = pd.read_csv(filename_for_gs_results, index_col='Unnamed: 0')
                     res = pd.concat([old_res, res])
                     res.to_csv(filename_for_gs_results)
-                    print(filename_for_gs_results, 'updated')
+                    self.logger.debug(filename_for_gs_results + ' updated')
 
             except Exception as e:
                 if 'ResourceExhaustedError' in str(type(e)): # can't catch this error directly... 
-                    print('Oops! ResourceExhaustedError. Continue next round')
+                    self.logger.warning('Oops! ResourceExhaustedError. Continue next round')
                     continue
                 else:
-                    print(e)
+                    self.logger.error(e)
                     break
                 
     ######### support functions #########
-    # feature engineering
-    def _generate_feature_engineering_file(self, feature_engineering_file_url, feature_engineering_dict):
-        with open(feature_engineering_file_url, 'w') as file:
-            json.dump(feature_engineering_dict, file, indent=4, sort_keys=True)
-    
     # create a feature
     """ 
     feature_engineering todo list
@@ -417,9 +387,9 @@ class AlphaBoosting:
     file_name: train__<function_name>__<feature_combination_name>__<possible_param>.pkl
                 test__<function_name>__<feature_combination_name>__<possible_param>.pkl
     """
-    def _add_column(self, line, f_map):
+    def _add_column(self, feature_to_gen):
         """
-        line: dict
+        feature_to_gen: dict
             e.g:
             _____
             {
@@ -438,16 +408,16 @@ class AlphaBoosting:
                 }
             }
         """
-        func = line.get('function')
-        #feature_cols = '_'.join(line.get('feature_cols'))
-        feature_cols = line.get('feature_cols')
-        params = line.get('params')
-        generated_feature_name = '__'.join([func, '_'.join(feature_cols)])
-        if line.get('params') != None: generated_feature_name += '__' + '_'.join(map(str, params.values()))
+        func = feature_to_gen.get('function')
+        #feature_cols = '_'.join(feature_to_gen.get('feature_cols'))
+        feature_cols = feature_to_gen.get('feature_cols')
+        params = feature_to_gen.get('params')
+        generated_feature_name = '__'.join([func.__name__, '_'.join(feature_cols)])
+        if feature_to_gen.get('params') != {}: generated_feature_name += '__' + '_'.join(map(str, params.values()))
         params['train_len'] = self.train_len
         if not os.path.exists(self.FEATUREDIR + generated_feature_name + '.pkl'):
             #TODO: test if passing df=df[feature_cols+[self.label]] can save memory
-            _df = f_map[func](df=self.df, cols=line.get('feature_cols'), dummy_col=self.label,
+            _df = func(df=self.df, cols=feature_to_gen.get('feature_cols'), dummy_col=self.label,
                               generated_feature_name=generated_feature_name, params=params)
             utils.save(df=_df, train_len=self.train_len, url=self.FEATUREDIR, name=generated_feature_name)
     
