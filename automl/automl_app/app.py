@@ -19,13 +19,13 @@ class AlphaBoosting:
         # 1. run_record need to to provides so that the previous run(if there is one) info can
         # be loaded, which will determine what need to be rerun and what don't
         # 2. don't create this file or modify this file
-        run_record = self.ROOT + self.config_dict['run_record_filename']
             
         self.features_to_gen = features_to_gen
                
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.LOGDIR = self.config_dict['project_root'] + 'log/'
-        self.DATADIR = self.config_dict['project_root'] + 'data/'
+        self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
+        self.run_record_url = self.OUTDIR + self.config_dict['run_record_filename']
         self.train_data_url = self.config_dict['train_data_url']
         self.test_data_url = self.config_dict['test_data_url']
         self.label = self.config_dict['label']
@@ -52,11 +52,11 @@ class AlphaBoosting:
         val_index_changed = False
         
         
-        if not os.path.exists(run_record):
-            self.logger.info('Run record file [{}] not found. Begin the first time run...'.format(run_record))
+        if not os.path.exists(self.run_record_url):
+            self.logger.info('Run record file [{}] not found. Begin the first time run...'.format(self.run_record_url))
         else:
-            self.logger.info('Run record file [{}] found. Continue from the previous run...'.format(run_record))
-            with open(run_record, 'r') as f: run_record_dict = json.load(f)
+            self.logger.info('Run record file [{}] found. Continue from the previous run...'.format(self.run_record_url))
+            with open(self.run_record_url, 'r') as f: run_record_dict = json.load(f)
             
             # check if validation and down sampling need to be redone
             prev_down_sampling_amt = run_record_dict['down_sampling_amt']
@@ -79,15 +79,15 @@ class AlphaBoosting:
                 
         
         # build relavent directories
-        self.FEATUREDIR = self.DATADIR + 'features/'
+        self.FEATUREDIR = self.TEMP_DATADIR + 'features/'
         if not os.path.exists(self.OUTDIR): os.makedirs(self.OUTDIR)
         if not os.path.exists(self.LOGDIR): os.makedirs(self.LOGDIR)
-        if not os.path.exists(self.DATADIR): os.makedirs(self.DATADIR)
+        if not os.path.exists(self.TEMP_DATADIR): os.makedirs(self.TEMP_DATADIR)
         if not os.path.exists(self.FEATUREDIR): os.makedirs(self.FEATUREDIR)
             
-        # save run_record:
+        # save self.run_record_url:
         self.logger.info('save run record')
-        self._save_run_record(run_record)
+        self._save_run_record()
         
         # generate todo list: c
         self.logger.info('generate todo list')
@@ -99,11 +99,11 @@ class AlphaBoosting:
             dictionary['val_downsample_generation'] = False
             
             if os.path.exists(self.LOGDIR + 'down_sampling_idx.json'): os.remove(self.LOGDIR + 'down_sampling_idx.json')
-            if os.path.exists(self.LOGDIR + 'val.pkl'): os.remove(self.DATADIR + 'val.pkl')
+            if os.path.exists(self.LOGDIR + 'val.pkl'): os.remove(self.TEMP_DATADIR + 'val.pkl')
             for i in range(prev_down_sampling_amt): 
-                if os.path.exists(self.DATADIR + str(i) + '.pkl'):
-                    os.remove(self.DATADIR + str(i) + '.pkl')
-            shutil.rmtree(self.DATADIR + 'split/')
+                if os.path.exists(self.TEMP_DATADIR + str(i) + '.pkl'):
+                    os.remove(self.TEMP_DATADIR + str(i) + '.pkl')
+            shutil.rmtree(self.TEMP_DATADIR + 'split/')
         
         # feature engineering
         self.logger.info('feature engineering')
@@ -135,7 +135,7 @@ class AlphaBoosting:
             json.dump(dictionary, f, indent=4, sort_keys=True)
 
             
-    def _save_run_record(self, run_record_url):
+    def _save_run_record(self):
         run_record = {
             'project_root':         self.ROOT,
             'train_data_url':       self.train_data_url,
@@ -150,8 +150,9 @@ class AlphaBoosting:
         val_index_url = self.LOGDIR + 'val_index.json'
         run_record['validation_index'] = val_index_url 
         with open(val_index_url, 'w') as f: json.dump(self.validation_index, f, indent=4, sort_keys=True)
-            
-        with open(run_record_url, 'w') as f: json.dump(run_record, f, indent=4, sort_keys=True)
+        self.logger.info('val index is saved at {}'.format(val_index_url))
+        with open(self.run_record_url, 'w') as f: json.dump(run_record, f, indent=4, sort_keys=True)
+        self.logger.info('run record is saved at {}'.format(self.run_record_url))
         del run_record 
         gc.collect()
             
@@ -205,7 +206,7 @@ class AlphaBoosting:
         if not dictionary['val_downsample_generation']:
             if self.down_sampling_amt != 0:
                 # down sampling
-                down_sampling_url = self.DATADIR + 'split/'
+                down_sampling_url = self.TEMP_DATADIR + 'split/'
                 if not os.path.exists(down_sampling_url): os.makedirs(down_sampling_url)
                 index.extend(self._generate_down_sampling_index_file(dictionary['val_downsample_generate_index']))
                 for i in range(self.down_sampling_amt): 
@@ -213,7 +214,7 @@ class AlphaBoosting:
                     if not os.path.exists(split_folder[-1]): os.makedirs(split_folder[-1])
 
             # validation
-            split_folder.append(self.DATADIR + 'split/val/')
+            split_folder.append(self.TEMP_DATADIR + 'split/val/')
             index.append(self.validation_index)
             if not os.path.exists(split_folder[-1]): os.makedirs(split_folder[-1])
                 
@@ -243,7 +244,7 @@ class AlphaBoosting:
                 file_name_body = 'train' if split_folder[i] == self.FEATUREDIR else split_folder[i].split('/')[-2]
                 self._get_file_concat(base_df=self.train.loc[index[i]].copy().reset_index(drop=True),
                                       split_folder=split_folder[i], 
-                                      concat_folder=self.DATADIR, 
+                                      concat_folder=self.TEMP_DATADIR, 
                                       is_train=True, 
                                       file_name_body=file_name_body)
             self._renew_status(dictionary, 'val_downsample_generation', self.LOGDIR + 'todo_list.json')
@@ -252,11 +253,11 @@ class AlphaBoosting:
     def _grid_search(self, dictionary):
         if not dictionary['grid_search']:
             if self.down_sampling_amt == 0:
-                train = pd.read_pickle(self.DATADIR+'train.pkl')
+                train = pd.read_pickle(self.TEMP_DATADIR+'train.pkl')
             else:
-                train = pd.read_pickle(self.DATADIR+'0.pkl')
-            val = pd.read_pickle(self.DATADIR+'val.pkl')
-            test = pd.read_pickle(self.DATADIR+'test.pkl')
+                train = pd.read_pickle(self.TEMP_DATADIR+'0.pkl')
+            val = pd.read_pickle(self.TEMP_DATADIR+'val.pkl')
+            test = pd.read_pickle(self.TEMP_DATADIR+'test.pkl')
             
             categorical_features = self.config_dict['categorical_features']
             not_features = self.config_dict['not_features']
@@ -264,7 +265,7 @@ class AlphaBoosting:
             label_col_as_list=[label_col]
             feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
             
-            gs_record = self.ROOT + self.config_dict['gs_record_filename']
+            gs_record = self.OUTDIR + self.config_dict['gs_record_filename']
             gs_search_rounds = self.config_dict['gs_search_rounds']
             gs_metric = self.config_dict['gs_metric']
             gs_cv = self.config_dict['gs_cv']
@@ -288,12 +289,6 @@ class AlphaBoosting:
                 
     ######### support functions #########
     # create a feature
-    """ 
-    feature_engineering todo list
-    feature_engineering.txt line: <function_name>__<feature_combination_name>__<possible_param>
-    file_name: train__<function_name>__<feature_combination_name>__<possible_param>.pkl
-                test__<function_name>__<feature_combination_name>__<possible_param>.pkl
-    """
     def _add_column(self, feature_to_gen):
         """
         feature_to_gen: dict
@@ -333,7 +328,7 @@ class AlphaBoosting:
         if not dictionary['concat_test']:
             self._get_file_concat(base_df=self.test.copy(), 
                                   split_folder=self.FEATUREDIR, 
-                                  concat_folder=self.DATADIR, 
+                                  concat_folder=self.TEMP_DATADIR, 
                                   is_train=False, 
                                   file_name_body='test')
             self._renew_status(dictionary, 'concat_test', self.LOGDIR + 'todo_list.json')
