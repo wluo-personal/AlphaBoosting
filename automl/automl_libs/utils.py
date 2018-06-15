@@ -37,12 +37,12 @@ def save(df=None, flg='both', train_len=0, url='./', name='default'):
         filename2 = 'test__' + name + '.pkl'
         df[:train_len].reset_index(drop=True).to_pickle(url + filename1)
         df[train_len:].reset_index(drop=True).to_pickle(url + filename2)
-        module_logger.debug('{} saved at {}'.format(filename1, url))
-        module_logger.debug('{} saved at {}'.format(filename2, url))
+        #module_logger.debug('{} saved at {}'.format(filename1, url))
+        #module_logger.debug('{} saved at {}'.format(filename2, url))
     elif flg=='train' or flg=='test':
         filename = flg + '__' + name + '.pkl'
         df.reset_index(drop=True).to_pickle(url + filename)
-        module_logger.debug('{} saved at {}'.format(filename, url))
+        #module_logger.debug('{} saved at {}'.format(filename, url))
     else:
         raise ValueError('flg options: both/train/test')
 
