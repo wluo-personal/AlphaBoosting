@@ -1,4 +1,5 @@
 import time, os
+from datetime import timedelta
 import lightgbm as lgb
 import pandas as pd
 import numpy as np
@@ -28,7 +29,7 @@ def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_
             lgb_params = {
                 'objective': 'binary',
                 'boosting': 'gbdt',
-                'num_rounds': 4000,
+                'num_rounds': 10,
                 'learning_rate': np.random.choice([0.1,0.03,0.001]),
                 'num_leaves': np.random.choice([15,31,61,127]),
                 'num_threads': 4, # best speed: set to number of real cpu cores, which is vCPU/2
@@ -47,9 +48,8 @@ def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_
 #             pp = pprint.PrettyPrinter(indent=4)
 #             pp.pprint(lgb_params)
 
-            import pdb
-            pdb.set_trace()
             lgb_params['timestamp'] = utils.get_time()
+            gs_start_time = time.time()
             if cv:
                 eval_hist = lgb.cv(lgb_params, lgb_train, nfold=nfold, 
                                    categorical_feature=categorical_feature, verbose_eval=verbose_eval, seed=seed)
@@ -62,20 +62,29 @@ def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_
                 lgb_params['best_round'] = model.best_iteration
                 lgb_params['val_'+metric] = model.best_score['valid_1'][metric]
                 lgb_params['train_'+metric] = model.best_score['training'][metric]
+            
+            # time spent in this round of search, in format hh:mm:ss
+            gs_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - gs_start_time)))
+            lgb_params['gs_timespent'] = gs_elapsed_time_as_hhmmss
 
 
             if do_preds:
+                predict_start_time = time.time()
                 module_logger.debug('[do_preds] is True, generating predictions ...')
                 if cv:
+                    module_logger.debug('Retrain model using cv params and all data...')
                     lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
                     model = lgb.train(lgb_params, lgb_train, valid_sets=lgb_train, 
                                       num_boost_round=best_rounds, verbose_eval=int(0.2*best_rounds))
+                module_logger.debug('Predicting...')
                 y_test = model.predict(X_test)
                 np.save(preds_save_path+'preds_{}'.format(run_id),  y_test)
-                lgb_params['preds'] = run_id 
+                predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
+                lgb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
                 module_logger.debug('Predictions({}) saved in {}.'.format(run_id, preds_save_path))
 
 
+            # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
             for k, v in lgb_params.items():
                 if isinstance(v, list):
                     lgb_params[k] = '"'+str(v)+'"'
