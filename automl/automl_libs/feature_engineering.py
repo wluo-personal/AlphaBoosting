@@ -196,9 +196,7 @@ def reverse_cumulative_count(df, cols, dummy_col, generated_feature_name, params
         Array of string names of columns.
     generated_feature_name : str
         This will be the name of column in the returned dataframe.
-    params : dictionary
-        Params is a dictionary that has various parametors.
-        In this method, params is not used.
+    params : dictionary, not used here
 
     Example
     -------
@@ -254,9 +252,7 @@ def variance(df, cols, dummy_col, generated_feature_name, params=None):
         Array of string names of columns.
     generated_feature_name : str
         This will be the name of column in the returned dataframe.
-    params : dictionary
-        Params is a dictionary that has various parametors.
-        In this method, params is not used.
+    params : dictionary, not used here
 
     See Also
     --------
@@ -274,7 +270,6 @@ def variance(df, cols, dummy_col, generated_feature_name, params=None):
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
 
-# params['coefficient']: 
 def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
     (coefficient * standard deviation)/mean of count number of combinations.
@@ -293,9 +288,7 @@ def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None
         Array of string names of columns.
     generated_feature_name : str
         This will be the name of column in the returned dataframe.
-    params : dictionary
-        Params is a dictionary that has various parametors.
-        In this method, params['coefficient'] are used.
+    params : dictionary, params['coefficient'] are used.
         params['coefficient'] is a string of a number.
 
     See Also
@@ -341,9 +334,7 @@ def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
         cols[-1] must be a column that indicates time.
     generated_feature_name : str
         This will be the name of column in the returned dataframe.
-    params : dictionary
-        Params is a dictionary that has various parametors.
-        In this method, params['n'] and params['fillna'] are used.
+    params : dictionary, params['n'] and params['fillna'] are used.
         params['n'] is a string of number that indicates the nth next occurrence.
         params['fillna'] is a string of number that specifies the number to replace NaN.
 
@@ -395,7 +386,6 @@ def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return result
 
-# params['n']: n, cols[-1]: time
 def count_in_previous_n_time_unit(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
     integers that indicates the number of previous occurrences of specific values
@@ -410,9 +400,7 @@ def count_in_previous_n_time_unit(df, cols, dummy_col, generated_feature_name, p
         cols[-1] must be a column that indicates time.
     generated_feature_name : str
         This will be the name of column in the returned dataframe.
-    params : dictionary
-        Params is a dictionary that has various parametors.
-        In this method, params['n'] is used.
+    params : dictionary, params['n'] is used.
         params['n'] is a string of number that indicates the number of time units that need to go back.
 
     Example
@@ -487,9 +475,7 @@ def count_in_next_n_time_unit(df, cols, dummy_col, generated_feature_name, param
         cols[-1] must be a column that indicates time.
     generated_feature_name : str
         This will be the name of column in the returned dataframe.
-    params : dictionary
-        Params is a dictionary that has various parametors.
-        In this method, params['n'] is used.
+    params : dictionary, params['n'] is used.
         params['n'] is a string of number that indicates the number of time units that need to go back.
 
     Example

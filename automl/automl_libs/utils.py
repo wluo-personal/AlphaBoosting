@@ -37,16 +37,33 @@ def save(df=None, flg='both', train_len=0, url='./', name='default'):
         filename2 = 'test__' + name + '.pkl'
         df[:train_len].reset_index(drop=True).to_pickle(url + filename1)
         df[train_len:].reset_index(drop=True).to_pickle(url + filename2)
-        module_logger.debug('{} saved at {}'.format(filename1, url))
-        module_logger.debug('{} saved at {}'.format(filename2, url))
+        #module_logger.debug('{} saved at {}'.format(filename1, url))
+        #module_logger.debug('{} saved at {}'.format(filename2, url))
     elif flg=='train' or flg=='test':
         filename = flg + '__' + name + '.pkl'
         df.reset_index(drop=True).to_pickle(url + filename)
-        module_logger.debug('{} saved at {}'.format(filename, url))
+        #module_logger.debug('{} saved at {}'.format(filename, url))
     else:
         raise ValueError('flg options: both/train/test')
 
+def get_time(timezone='America/New_York', time_format='%Y-%m-%d %H:%M:%S'):
+    from datetime import datetime
+    from dateutil import tz
 
+    # METHOD 1: Hardcode zones:
+    from_zone = tz.gettz('UTC')
+    to_zone = tz.gettz(timezone)
+
+    utc = datetime.utcnow()
+
+    # Tell the datetime object that it's in UTC time zone since 
+    # datetime objects are 'naive' by default
+    utc = utc.replace(tzinfo=from_zone)
+
+    # Convert time zone
+    est = utc.astimezone(to_zone)
+
+    return est.strftime(time_format)
 
 class FirstClass:
     def __init__(self):
