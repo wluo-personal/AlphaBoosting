@@ -1,0 +1,15 @@
+{
+   "root":"./",
+   "train_csv_url":"./a.txt",
+   "test_csv_url":"./b.txt",
+   "timestamp":null,
+   "label":"l",
+   "categorical_features":null,
+   "numerical_features":null,
+   "validation_index":[
+      1,
+      2
+   ],
+   "downsampling":2,
+   "down_sampling_ratio":0.5
+}

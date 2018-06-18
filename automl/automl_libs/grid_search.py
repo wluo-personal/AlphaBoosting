@@ -8,8 +8,12 @@ import logging
 module_logger = logging.getLogger(__name__)
 
 def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_rounds, 
-                        filename_for_gs_results, metric, cv, nfold, 
-                        verbose_eval, do_preds, X_test, preds_save_path):
+                        filename_for_gs_results, gs_params_gen, cv, nfold, 
+                        verbose_eval, do_preds, X_test, preds_save_path, suppress_warning):
+    
+    if suppress_warning:
+        import warnings
+        warnings.filterwarnings("ignore")
 
     if do_preds:
         if not os.path.exists(preds_save_path):
@@ -17,8 +21,8 @@ def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_
 
     for i in range(search_rounds):
         try:
-            seed = int(time.time()* 1000000) % 45234634
-            np.random.seed(seed)
+            lgb_params, seed = gs_params_gen()
+            metric = lgb_params['metric']
             time.sleep(1) # sleep 1 sec to make sure the run_id is unique
             run_id = int(time.time()) # also works as the index of the result dataframe
 
@@ -26,28 +30,9 @@ def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_
 
             lgb_val = lgb.Dataset(X_val, y_val, categorical_feature=categorical_feature)
 
-            lgb_params = {
-                'objective': 'binary',
-                'boosting': 'gbdt',
-                'num_rounds': 10,
-                'learning_rate': np.random.choice([0.1,0.03,0.001]),
-                'num_leaves': np.random.choice([15,31,61,127]),
-                'num_threads': 4, # best speed: set to number of real cpu cores, which is vCPU/2
-                'max_depth': -1, # no limit. This is used to deal with over-fitting when #data is small.
-                'min_data_in_leaf': np.random.randint(20,50),  #minimal number of data in one leaf. 
-                'feature_fraction': np.random.randint(3,11)/10,
-                'feature_fraction_seed': seed,
-                'early_stopping_round':70,
-                'bagging_freq': 1, #0 means disable bagging. k: perform bagging at every k iteration
-                'bagging_fraction': np.random.randint(3,11)/10, #Randomly select part of data 
-                'bagging_seed': seed,
-                'scale_pos_weight': 2,
-                'metric' : metric
-            }
 #             import pprint
 #             pp = pprint.PrettyPrinter(indent=4)
 #             pp.pprint(lgb_params)
-
             lgb_params['timestamp'] = utils.get_time()
             gs_start_time = time.time()
             if cv:
@@ -83,7 +68,10 @@ def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_
                 lgb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
                 module_logger.debug('Predictions({}) saved in {}.'.format(run_id, preds_save_path))
 
-
+            # remove params not needed to be recorded in grid search history csv
+            lgb_params.pop('categorical_column',None)
+            lgb_params.pop('verbose',None)
+                
             # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
             for k, v in lgb_params.items():
                 if isinstance(v, list):

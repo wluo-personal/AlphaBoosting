@@ -1,12 +1,11 @@
-import os, json, gc, logging, shutil
+import os, json, gc, logging, shutil, pickle
 import pandas as pd
 import numpy as np
 from automl_libs import utils, grid_search
-
 import pdb
     
 class AlphaBoosting:
-    def __init__(self, config_file, features_to_gen):
+    def __init__(self, config_file, features_to_gen, gs_params_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
 
         if config_file is None:
@@ -21,11 +20,11 @@ class AlphaBoosting:
         # 2. don't create this file or modify this file
             
         self.features_to_gen = features_to_gen
+        self.gs_params_gen = gs_params_gen
                
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
-        self.LOGDIR = self.config_dict['project_root'] + 'log/'
         self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
-        self.run_record_url = self.OUTDIR + self.config_dict['run_record_filename']
+        self.run_record_url = self.OUTDIR + self.config_dict['last_run_record_filename']
         self.train_data_url = self.config_dict['train_data_url']
         self.test_data_url = self.config_dict['test_data_url']
         self.label = self.config_dict['label']
@@ -35,7 +34,7 @@ class AlphaBoosting:
         # read data and determine validation set
         self._read_data()
         if self.config_dict['validation_index'] is not None:
-            self.validation_index = json.load(open(self.config_dict['validation_index']))
+            self.validation_index = pickle.load(open(self.config_dict['validation_index'], 'rb'))
             self.validation_ratio = None # means the 'ratio' param is overruled
         else:
             try:
@@ -46,7 +45,6 @@ class AlphaBoosting:
             self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
             
                 
-            
         downsampling_amount_changed = False
         down_sampling_ratio_changed = False
         val_index_changed = False
@@ -71,7 +69,7 @@ class AlphaBoosting:
                                   .format(prev_down_sampling_ratio, self.down_sampling_ratio))
                 down_sampling_ratio_changed = True
                 
-            prev_validation_index = json.load(open(run_record_dict['validation_index']))
+            prev_validation_index = pickle.load(open(run_record_dict['validation_index'],'rb'))
             if self.validation_index != prev_validation_index:
                 self.logger.debug('Validation index: previous: {}... new: {}...'
                                   .format(prev_validation_index[:3], self.validation_index[:3]))
@@ -81,7 +79,6 @@ class AlphaBoosting:
         # build relavent directories
         self.FEATUREDIR = self.TEMP_DATADIR + 'features/'
         if not os.path.exists(self.OUTDIR): os.makedirs(self.OUTDIR)
-        if not os.path.exists(self.LOGDIR): os.makedirs(self.LOGDIR)
         if not os.path.exists(self.TEMP_DATADIR): os.makedirs(self.TEMP_DATADIR)
         if not os.path.exists(self.FEATUREDIR): os.makedirs(self.FEATUREDIR)
             
@@ -91,15 +88,15 @@ class AlphaBoosting:
         
         # generate todo list: c
         self.logger.info('generate todo list')
-        dictionary = self._generate_todo_list()
+        to_do_dict = self._generate_todo_list()
         
         if downsampling_amount_changed or down_sampling_ratio_changed or val_index_changed:
-            dictionary['val_downsample_generate_index'] = False
-            dictionary['val_downsample_split'] = False
-            dictionary['val_downsample_generation'] = False
+            to_do_dict['val_downsample_generate_index'] = False
+            to_do_dict['val_downsample_split'] = False
+            to_do_dict['val_downsample_generation'] = False
             
-            if os.path.exists(self.LOGDIR + 'down_sampling_idx.json'): os.remove(self.LOGDIR + 'down_sampling_idx.json')
-            if os.path.exists(self.LOGDIR + 'val.pkl'): os.remove(self.TEMP_DATADIR + 'val.pkl')
+            if os.path.exists(self.TEMP_DATADIR + 'down_sampling_idx.pkl'): os.remove(self.TEMP_DATADIR + 'down_sampling_idx.pkl')
+            if os.path.exists(self.TEMP_DATADIR + 'val.pkl'): os.remove(self.TEMP_DATADIR + 'val.pkl')
             for i in range(prev_down_sampling_amt): 
                 if os.path.exists(self.TEMP_DATADIR + str(i) + '.pkl'):
                     os.remove(self.TEMP_DATADIR + str(i) + '.pkl')
@@ -107,19 +104,19 @@ class AlphaBoosting:
         
         # feature engineering
         self.logger.info('feature engineering')
-        self._feature_engineering(dictionary)
+        self._feature_engineering(to_do_dict)
         
         # get validation
         self.logger.info('validation')
-        self._validation_and_down_sampling(dictionary)
+        self._validation_and_down_sampling(to_do_dict)
         
         # concatenant test: c
         self.logger.info('concat test')
-        self._concat_test(dictionary)
+        self._concat_test(to_do_dict)
         
         # grid search
         self.logger.info('grid search')
-        self._grid_search(dictionary)
+        self._grid_search(to_do_dict)
     
     
     ######### util functions #########
@@ -129,10 +126,10 @@ class AlphaBoosting:
         self.df = pd.concat([self.train, self.test], ignore_index=True)
         self.train_len = self.train.shape[0]
         
-    def _renew_status(self, dictionary, key, file_url):
-        dictionary[key] = True
+    def _renew_status(self, to_do_dict, key, file_url):
+        to_do_dict[key] = True
         with open(file_url, 'w') as f:
-            json.dump(dictionary, f, indent=4, sort_keys=True)
+            json.dump(to_do_dict, f, indent=4, sort_keys=True)
 
             
     def _save_run_record(self):
@@ -147,9 +144,10 @@ class AlphaBoosting:
         if self.validation_ratio is not None: # means param: [validation_ratio] is not overruled by param [validation_index]
             run_record['validation_ratio'] = self.validation_ratio
             
-        val_index_url = self.LOGDIR + 'val_index.json'
+        val_index_url = self.TEMP_DATADIR + 'val_index.pkl'
         run_record['validation_index'] = val_index_url 
-        with open(val_index_url, 'w') as f: json.dump(self.validation_index, f, indent=4, sort_keys=True)
+        pickle.dump(self.validation_index, open(val_index_url,'wb'))
+        #with open(val_index_url, 'w') as f: json.dump(self.validation_index, f, indent=4, sort_keys=True)
         self.logger.info('val index is saved at {}'.format(val_index_url))
         with open(self.run_record_url, 'w') as f: json.dump(run_record, f, indent=4, sort_keys=True)
         self.logger.info('run record is saved at {}'.format(self.run_record_url))
@@ -176,11 +174,11 @@ class AlphaBoosting:
     
     ######### main functions #########
     def _generate_todo_list(self):
-        if os.path.exists(self.LOGDIR + 'todo_list.json'):
-            with open(self.LOGDIR + 'todo_list.json', 'r') as file:
-                dictionary = json.load(file)
+        if os.path.exists(self.OUTDIR + 'todo_list.json'):
+            with open(self.OUTDIR + 'todo_list.json', 'r') as file:
+                to_do_dict = json.load(file)
         else:
-            dictionary = {
+            to_do_dict = {
                 'feature_engineering':           False, 
                 'val_downsample_generate_index': False,
                 'val_downsample_split':          False,
@@ -188,27 +186,26 @@ class AlphaBoosting:
                 'concat_test':                   False,
                 'grid_search':                   False
             }
-            with open(self.LOGDIR + 'todo_list.json', 'w') as file: 
-                json.dump(dictionary, file, indent=4, sort_keys=True)
-        return dictionary
+            with open(self.OUTDIR + 'todo_list.json', 'w') as file: 
+                json.dump(to_do_dict, file, indent=4, sort_keys=True)
+        return to_do_dict
     
-    def _feature_engineering(self, dictionary):
-        feature_engineering_file_url = self.LOGDIR + 'feature_engineering.json'
-        if not dictionary['feature_engineering']:
+    def _feature_engineering(self, to_do_dict):
+        if not to_do_dict['feature_engineering']:
             for feature_to_gen in self.features_to_gen:
                 self._add_column(feature_to_gen)
-        self._renew_status(dictionary, 'feature_engineering', (self.LOGDIR + 'todo_list.json'))
+        self._renew_status(to_do_dict, 'feature_engineering', (self.OUTDIR + 'todo_list.json'))
     
-    def _validation_and_down_sampling(self, dictionary):
+    def _validation_and_down_sampling(self, to_do_dict):
         split_folder = []
         index = []
         down_sampling_url = None
-        if not dictionary['val_downsample_generation']:
+        if not to_do_dict['val_downsample_generation']:
             if self.down_sampling_amt != 0:
                 # down sampling
                 down_sampling_url = self.TEMP_DATADIR + 'split/'
                 if not os.path.exists(down_sampling_url): os.makedirs(down_sampling_url)
-                index.extend(self._generate_down_sampling_index_file(dictionary['val_downsample_generate_index']))
+                index.extend(self._generate_down_sampling_index_file(to_do_dict['val_downsample_generate_index']))
                 for i in range(self.down_sampling_amt): 
                     split_folder.append(down_sampling_url+str(i)+'/')
                     if not os.path.exists(split_folder[-1]): os.makedirs(split_folder[-1])
@@ -218,10 +215,10 @@ class AlphaBoosting:
             index.append(self.validation_index)
             if not os.path.exists(split_folder[-1]): os.makedirs(split_folder[-1])
                 
-            self._renew_status(dictionary, 'val_downsample_generate_index', self.LOGDIR + 'todo_list.json')
+            self._renew_status(to_do_dict, 'val_downsample_generate_index', self.OUTDIR + 'todo_list.json')
         
         # split files
-        if not dictionary['val_downsample_split']:
+        if not to_do_dict['val_downsample_split']:
             for file in os.listdir(self.FEATUREDIR):
                 split_file = file.split('.')
                 if split_file[-1] == 'pkl':
@@ -233,10 +230,10 @@ class AlphaBoosting:
                                 tmp_df.loc[index[i]].reset_index(drop=True).to_pickle(split_folder[i] + file)
                                 del tmp_df
                                 gc.collect()
-            self._renew_status(dictionary, 'val_downsample_split', self.LOGDIR + 'todo_list.json')
+            self._renew_status(to_do_dict, 'val_downsample_split', self.OUTDIR + 'todo_list.json')
         
         # concat files
-        if not dictionary['val_downsample_generation']:
+        if not to_do_dict['val_downsample_generation']:
             if self.down_sampling_amt == 0:
                 index.append(sorted(list(set(range(self.train_len)).difference(set(self.validation_index)))))
                 split_folder.append(self.FEATUREDIR)
@@ -247,11 +244,11 @@ class AlphaBoosting:
                                       concat_folder=self.TEMP_DATADIR, 
                                       is_train=True, 
                                       file_name_body=file_name_body)
-            self._renew_status(dictionary, 'val_downsample_generation', self.LOGDIR + 'todo_list.json')
+            self._renew_status(to_do_dict, 'val_downsample_generation', self.OUTDIR + 'todo_list.json')
         
     
-    def _grid_search(self, dictionary):
-        if not dictionary['grid_search']:
+    def _grid_search(self, to_do_dict):
+        if not to_do_dict['grid_search']:
             if self.down_sampling_amt == 0:
                 train = pd.read_pickle(self.TEMP_DATADIR+'train.pkl')
             else:
@@ -259,19 +256,19 @@ class AlphaBoosting:
             val = pd.read_pickle(self.TEMP_DATADIR+'val.pkl')
             test = pd.read_pickle(self.TEMP_DATADIR+'test.pkl')
             
-            categorical_features = self.config_dict['categorical_features']
             not_features = self.config_dict['not_features']
+            categorical_features = list(set(self.config_dict['categorical_features']) - set(not_features))
             label_col = self.config_dict['label']
             label_col_as_list=[label_col]
             feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
             
             gs_record = self.OUTDIR + self.config_dict['gs_record_filename']
             gs_search_rounds = self.config_dict['gs_search_rounds']
-            gs_metric = self.config_dict['gs_metric']
             gs_cv = self.config_dict['gs_cv']
             gs_nfold = self.config_dict['gs_nfold']
             gs_verbose_eval = self.config_dict['gs_verbose_eval']
             gs_do_preds = self.config_dict['gs_do_preds']
+            gs_sup_warning = self.config_dict['gs_suppress_warning']
             
             X_train = train[feature_cols]
             y_train = train[label_col]
@@ -281,11 +278,14 @@ class AlphaBoosting:
             
             grid_search.lgb_grid_search(X_train, y_train, X_val, y_val,
                                          categorical_features, search_rounds=gs_search_rounds, 
-                                         filename_for_gs_results=gs_record, metric=gs_metric,
-                                         cv=gs_cv, nfold=gs_nfold, verbose_eval=100,
-                                         do_preds=gs_do_preds, X_test=X_test, preds_save_path=self.OUTDIR+'gs_saved_preds/')
-        #self._renew_status(dictionary, 'grid_search', self.LOGDIR + 'todo_list.json')
-    
+                                         filename_for_gs_results=gs_record, 
+                                         gs_params_gen=self.gs_params_gen,
+                                         cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
+                                         do_preds=gs_do_preds, X_test=X_test,
+                                         preds_save_path=self.OUTDIR+'gs_saved_preds/',
+                                         suppress_warning=gs_sup_warning)
+        #self._renew_status(to_do_dict, 'grid_search', self.OUTDIR + 'todo_list.json')
+        
                 
     ######### support functions #########
     # create a feature
@@ -324,14 +324,14 @@ class AlphaBoosting:
             utils.save(df=_df, train_len=self.train_len, url=self.FEATUREDIR, name=generated_feature_name)
     
     # concat test
-    def _concat_test(self, dictionary):
-        if not dictionary['concat_test']:
+    def _concat_test(self, to_do_dict):
+        if not to_do_dict['concat_test']:
             self._get_file_concat(base_df=self.test.copy(), 
                                   split_folder=self.FEATUREDIR, 
                                   concat_folder=self.TEMP_DATADIR, 
                                   is_train=False, 
                                   file_name_body='test')
-            self._renew_status(dictionary, 'concat_test', self.LOGDIR + 'todo_list.json')
+            self._renew_status(to_do_dict, 'concat_test', self.OUTDIR + 'todo_list.json')
         gc.collect()
     
     def _generate_down_sampling_index_file(self, has_file_built):
@@ -342,9 +342,9 @@ class AlphaBoosting:
             return np.sort(idx).astype(int).tolist()
         
         index = []
+        down_sampling_idx_url = self.TEMP_DATADIR + 'down_sampling_idx.pkl'
         if has_file_built:
-            with open(self.LOGDIR + 'down_sampling_idx.json', 'r') as file:
-                index = json.load(file)
+            index = pickle.load(open(down_sampling_idx_url,'rb'))
         else:
             train_exclude_val = self.train.drop(self.validation_index, axis=0)
             positive = list(train_exclude_val[train_exclude_val[self.label]==1].index.values)
@@ -353,6 +353,5 @@ class AlphaBoosting:
             for i in range(self.down_sampling_amt): index.append(_downsampling(positive, negative, ratio))
             del train_exclude_val
             gc.collect()
-            with open(self.LOGDIR + 'down_sampling_idx.json', 'w') as file:
-                json.dump(index, file, indent=4, sort_keys=True)
+            pickle.dump(index, open(down_sampling_idx_url,'wb'))
         return index
