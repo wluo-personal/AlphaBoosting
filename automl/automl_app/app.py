@@ -2,11 +2,10 @@ import os, json, gc, logging, shutil
 import pandas as pd
 import numpy as np
 from automl_libs import utils, grid_search
-
 import pdb
     
 class AlphaBoosting:
-    def __init__(self, config_file, features_to_gen):
+    def __init__(self, config_file, features_to_gen, gs_params_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
 
         if config_file is None:
@@ -21,6 +20,7 @@ class AlphaBoosting:
         # 2. don't create this file or modify this file
             
         self.features_to_gen = features_to_gen
+        self.gs_params_gen = gs_params_gen
                
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.LOGDIR = self.config_dict['project_root'] + 'log/'
@@ -46,7 +46,6 @@ class AlphaBoosting:
             self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
             
                 
-            
         downsampling_amount_changed = False
         down_sampling_ratio_changed = False
         val_index_changed = False
@@ -267,11 +266,11 @@ class AlphaBoosting:
             
             gs_record = self.OUTDIR + self.config_dict['gs_record_filename']
             gs_search_rounds = self.config_dict['gs_search_rounds']
-            gs_metric = self.config_dict['gs_metric']
             gs_cv = self.config_dict['gs_cv']
             gs_nfold = self.config_dict['gs_nfold']
             gs_verbose_eval = self.config_dict['gs_verbose_eval']
             gs_do_preds = self.config_dict['gs_do_preds']
+            gs_sup_warning = self.config_dict['gs_suppress_warning']
             
             X_train = train[feature_cols]
             y_train = train[label_col]
@@ -281,9 +280,12 @@ class AlphaBoosting:
             
             grid_search.lgb_grid_search(X_train, y_train, X_val, y_val,
                                          categorical_features, search_rounds=gs_search_rounds, 
-                                         filename_for_gs_results=gs_record, metric=gs_metric,
+                                         filename_for_gs_results=gs_record, 
+                                         gs_params_gen=self.gs_params_gen,
                                          cv=gs_cv, nfold=gs_nfold, verbose_eval=100,
-                                         do_preds=gs_do_preds, X_test=X_test, preds_save_path=self.OUTDIR+'gs_saved_preds/')
+                                         do_preds=gs_do_preds, X_test=X_test,
+                                         preds_save_path=self.OUTDIR+'gs_saved_preds/',
+                                         suppress_warning=gs_sup_warning)
         #self._renew_status(dictionary, 'grid_search', self.LOGDIR + 'todo_list.json')
     
                 
