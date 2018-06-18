@@ -258,8 +258,8 @@ class AlphaBoosting:
             val = pd.read_pickle(self.TEMP_DATADIR+'val.pkl')
             test = pd.read_pickle(self.TEMP_DATADIR+'test.pkl')
             
-            categorical_features = self.config_dict['categorical_features']
             not_features = self.config_dict['not_features']
+            categorical_features = list(set(self.config_dict['categorical_features']) - set(not_features))
             label_col = self.config_dict['label']
             label_col_as_list=[label_col]
             feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
@@ -282,12 +282,12 @@ class AlphaBoosting:
                                          categorical_features, search_rounds=gs_search_rounds, 
                                          filename_for_gs_results=gs_record, 
                                          gs_params_gen=self.gs_params_gen,
-                                         cv=gs_cv, nfold=gs_nfold, verbose_eval=100,
+                                         cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
                                          do_preds=gs_do_preds, X_test=X_test,
                                          preds_save_path=self.OUTDIR+'gs_saved_preds/',
                                          suppress_warning=gs_sup_warning)
         #self._renew_status(dictionary, 'grid_search', self.LOGDIR + 'todo_list.json')
-    
+        
                 
     ######### support functions #########
     # create a feature
