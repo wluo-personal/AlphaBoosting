@@ -2,7 +2,7 @@
 *.log
 toxic/sc/stacking/obj/
 *.csv
-*.json
+val_index.json
 *.hdf5
 .ipynb_checkpoints
 *.pyc
