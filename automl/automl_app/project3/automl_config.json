@@ -1,0 +1,35 @@
+{
+    "project_root": "./",
+    "run_record_filename": "run_record.json",
+    "train_data_url": "data/train.pkl",
+    "test_data_url": "data/test.pkl",
+    "down_sampling_amt": 0,
+    "down_sampling_ratio": null,
+    "validation_index": null, 
+    "validation_ratio": 0,
+        
+    "categorical_features": ["user", "movie", "age", "gender", "occupation", "zip", "released"],
+    "not_features": [],
+    "label": "label",
+    "gs_record_filename": "project3_grid_search.csv",
+    "gs_search_rounds": 1,
+    "gs_cv": true,
+    "gs_nfold": 5,
+    "gs_verbose_eval": 10,
+    "gs_do_preds": true,
+    "gs_suppress_warning": true,
+        
+    "_comments": {
+        "validation_ratio": "1. overruled by validation_index, 2. set it to 0 and index to null if gs_cv is true",
+        "validation_index": "json (or maybe better with pickle?) file that specify index of data for validation",
+        "down_sampling_amt": [
+            "integer. 0: no downsampling. >0, the amount of downsamplings",
+            "Note 1: combine the same positive samples with different negative samples will result in a different downsampling (assume more neg samples then pos samples",
+            "Note 2: when set to 0, 'down_sampling_ratio' has no effect"
+        ],
+        "down_sampling_ratio": [
+            "null or float in (0,1]",
+            "Note: e.g. if 0.7, means chosen all pos samples plus 70% of negative samples. if null, then choose the all pos samples plus same amount of neg samples. (assume more neg samples then pos samples.)"
+        ]
+    }
+}
