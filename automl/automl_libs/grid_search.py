@@ -1,8 +1,10 @@
-import time, os
+import time
+import os
 from datetime import timedelta
-import lightgbm as lgb
 import pandas as pd
 import numpy as np
+import lightgbm as lgb
+from keras.callbacks import LearningRateScheduler, EarlyStopping, ModelCheckpoint
 from automl_libs import utils, nn_libs
 import logging
 module_logger = logging.getLogger(__name__)
@@ -11,7 +13,7 @@ module_logger = logging.getLogger(__name__)
 def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
        gs_record_dir, gs_params_gen, gs_model, cv, nfold,
        verbose_eval, do_preds, X_test, preds_save_path, suppress_warning):
-    
+
     if suppress_warning:
         import warnings
         warnings.filterwarnings("ignore")
@@ -68,9 +70,9 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
     lgb_val = lgb.Dataset(X_val, y_val, categorical_feature=categorical_feature)
 
-    #             import pprint
-    #             pp = pprint.PrettyPrinter(indent=4)
-    #             pp.pprint(lgb_params)
+    # import pprint
+    # pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(lgb_params)
     lgb_params['timestamp'] = utils.get_time()
     gs_start_time = time.time()
     if cv:
@@ -98,12 +100,11 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
             model = lgb.train(lgb_params, lgb_train, valid_sets=lgb_train,
                               num_boost_round=best_rounds, verbose_eval=int(0.2 * best_rounds))
-        module_logger.debug('Predicting...')
         y_test = model.predict(X_test)
-        np.save(preds_save_path + 'preds_{}'.format(run_id), y_test)
+        np.save(preds_save_path + 'lgb_preds_{}'.format(run_id), y_test)
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         lgb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
-        module_logger.debug('Predictions({}) saved in {}.'.format(run_id, preds_save_path))
+        module_logger.info('LGB predictions({}) saved in {}.'.format(run_id, preds_save_path))
 
     # remove params not needed to be recorded in grid search history csv
     lgb_params.pop('categorical_column', None)
@@ -115,7 +116,6 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
 def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
            gs_params_gen, gs_model, verbose_eval,
            do_preds, X_test, preds_save_path):
-    from keras.callbacks import LearningRateScheduler, EarlyStopping, ModelCheckpoint
     nn_params, seed = gs_params_gen(gs_model)
     time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
     run_id = int(time.time())
@@ -133,15 +133,16 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
         os.makedirs(nn_saved_models_path)
     saved_model_file_name = nn_saved_models_path + 'nn_{}.hdf5'.format(run_id)
 
+    pred_batch_size = nn_params['pred_batch_size']
     cb = [
-        nn_libs.RocAucMetricCallback(validation_data=(valid_dict, y_val)),  # include it before EarlyStopping!
+        nn_libs.RocAucMetricCallback(validation_data=(valid_dict, y_val), predict_batch_size=pred_batch_size),  # include it before EarlyStopping!
         EarlyStopping(monitor='roc_auc_val', mode='max', patience=nn_params['patience'], verbose=2),
         nn_libs.LearningRateTracker(include_on_batch=False),
         ModelCheckpoint(saved_model_file_name, monitor='roc_auc_val', verbose=1, save_best_only=True, mode='max')
         # LearningRateScheduler(lambda x: lr * (lr_decay ** x))
     ]
     model.fit(train_dict, y_train, validation_data=[valid_dict, y_val],
-              epochs=nn_params['max_epochs'], batch_size=nn_params['batch_size'], verbose=verbose_eval, callbacks=cb)
+              epochs=nn_params['max_ep'], batch_size=nn_params['batch_size'], verbose=verbose_eval, callbacks=cb)
 
     hist = model.history
     bst_epoch = np.argmax(hist.history['roc_auc_val'])
@@ -160,10 +161,15 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
     gs_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - gs_start_time)))
     nn_params['gs_timespent'] = gs_elapsed_time_as_hhmmss
 
-    import pprint
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(nn_params)
+    if do_preds:
+        predict_start_time = time.time()
+        module_logger.debug('[do_preds] is True, generating predictions ...')
+        model.load_weights(saved_model_file_name)
+        y_test = model.predict(test_dict, batch_size=pred_batch_size, verbose=verbose_eval)
+        np.save(preds_save_path + 'nn_preds_{}'.format(run_id), y_test)
+        predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
+        nn_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
+        module_logger.info('NN predictions({}) saved in {}.'.format(run_id, preds_save_path))
 
-    # TODO: do_preds
-
+    nn_params.pop('pred_batch_size')
     return nn_params, run_id

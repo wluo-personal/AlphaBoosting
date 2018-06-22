@@ -33,11 +33,10 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             feature_input_list.append(cat_input)
             embed_input_dim = np.max([X_train[col].max(), X_val[col].max(), X_test[col].max()]) + 1
             embed_output_dimension = nn_params[
-                'cate_embedding_dimension']  # np.min([cate_embedding_dimension, embed_input_dim])
+                'cat_emb_outdim']  # np.min([nn_params['cat_emb_outdim'], embed_input_dim])
             total_cate_embedding_dimension += embed_output_dimension
-            module_logger.debug('prepare col [{}] for NN'.format(col))
-            module_logger.debug('embed input dimension: {}'.format(embed_input_dim))
-            module_logger.debug('embed output dimension: {}'.format(embed_output_dimension))
+            module_logger.debug('Col [{}]: embed dim: input {}, output {}'
+                                .format(col, embed_input_dim, embed_output_dimension))
             embed_node = Embedding(embed_input_dim, embed_output_dimension)(cat_input)
             embed_nodes_list.append(embed_node)
         embed_layer = concatenate(embed_nodes_list)
@@ -52,7 +51,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         num_input = Input(shape=(len(numerical_features),), name=key_for_numerical_features)
         feature_input_list.append(num_input)
         numerical_node = num_input
-        for i in range(nn_params['dense_numerical_n_layers']):
+        for i in range(nn_params['num_dense_n_layers']):
             numerical_node = functional_dense(nn_params['dense_units'], numerical_node,
                                               batch_norm=True, act='relu',
                                               dropout=nn_params['drop_rate'], name='numerical_{}'.format(i))
@@ -76,7 +75,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         return (init / fin) ** (1 / (steps - 1)) - 1
 
     steps_in_one_epoch = int(len(X_train) / nn_params['batch_size'])
-    steps_for_lr_decay = steps_in_one_epoch * nn_params['epochs_for_lr']
+    steps_for_lr_decay = steps_in_one_epoch * nn_params['ep_for_lr']
     lr_decay = exp_decay(nn_params['lr_init'], nn_params['lr_fin'], steps_for_lr_decay)
     module_logger.debug('steps in on epoch: {}'.format(steps_in_one_epoch))
     module_logger.debug('steps for lr decay: {}'.format(steps_for_lr_decay))
@@ -84,7 +83,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
     optimizer = Adam(lr=nn_params['lr_init'], decay=lr_decay)
 
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-    model.summary()
+    # model.summary()
 
     return model, train_dict, valid_dict, test_dict
 
@@ -132,8 +131,8 @@ class LearningRateTracker(Callback):
         lr_decay = self.model.optimizer.decay
         iterations = self.model.optimizer.iterations
         lr_current = lr_init / (1. + lr_decay * K.cast(iterations, K.dtype(lr_decay)))
-        self.logger.debug('After this {}: init lr {:.6f}, lr_decay {:.6f}, '
-                          'iterations {}, current lr {:.6f}'
+        self.logger.debug('At {} end: init lr {:.5f}, lr_decay {:.5f}, '
+                          'iterations {}, current lr {:.5f}'
                           .format(log_flag, K.eval(lr_init), K.eval(lr_decay),
                                   K.eval(iterations), K.eval(lr_current)))
         # Use the following if you are using LearningRateScheduler in callbacks
