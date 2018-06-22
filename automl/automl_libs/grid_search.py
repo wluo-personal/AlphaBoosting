@@ -7,9 +7,10 @@ from automl_libs import utils
 import logging
 module_logger = logging.getLogger(__name__)
 
+
 def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_rounds, 
-                        filename_for_gs_results, gs_params_gen, cv, nfold, 
-                        verbose_eval, do_preds, X_test, preds_save_path, suppress_warning):
+                    filename_for_gs_results, gs_params_gen, cv, nfold,
+                    verbose_eval, do_preds, X_test, preds_save_path, suppress_warning):
     
     if suppress_warning:
         import warnings
@@ -24,7 +25,7 @@ def lgb_grid_search(X_train, y_train, X_val, y_val, categorical_feature, search_
             lgb_params, seed = gs_params_gen()
             metric = lgb_params['metric']
             time.sleep(1) # sleep 1 sec to make sure the run_id is unique
-            run_id = int(time.time()) # also works as the index of the result dataframe
+            run_id = int(time.time())  # also works as the index of the result dataframe
 
             lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
 

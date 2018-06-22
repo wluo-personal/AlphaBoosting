@@ -1,9 +1,11 @@
-import os, json, gc, logging, shutil, pickle
 import pandas as pd
 import numpy as np
-from automl_libs import utils, grid_search
+import os, json, gc, logging, shutil, pickle, time
+from keras.callbacks import LearningRateScheduler, EarlyStopping, ModelCheckpoint
+from automl_libs import utils, grid_search, nn_libs
 import pdb
-    
+
+
 class AlphaBoosting:
     def __init__(self, config_file, features_to_gen, gs_params_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
@@ -21,7 +23,7 @@ class AlphaBoosting:
             
         self.features_to_gen = features_to_gen
         self.gs_params_gen = gs_params_gen
-               
+
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
         self.run_record_url = self.OUTDIR + self.config_dict['last_run_record_filename']
@@ -269,21 +271,76 @@ class AlphaBoosting:
             gs_verbose_eval = self.config_dict['gs_verbose_eval']
             gs_do_preds = self.config_dict['gs_do_preds']
             gs_sup_warning = self.config_dict['gs_suppress_warning']
-            
-            X_train = train[feature_cols]
-            y_train = train[label_col]
+
+            X_train = train[feature_cols].head(10000) ########################
+            y_train = train[label_col].head(10000)
             X_val = val[feature_cols]
             y_val = val[label_col]
             X_test = test[feature_cols]
+
+            # from keras.initializers import RandomUniform
+            # from keras.regularizers import l1, l2, l1_l2
+            # from keras.models import Model
+            # from keras.optimizers import Adam
+
+            nn_params = {
+                'nn_seed': int(time.time() * 1000000) % 45234634,
+                'epochs_for_lr': 1,
+                'lr_init': 0.01,
+                'lr_fin': 0.005,
+                'batch_size': 2048,
+                'max_epochs': 1,
+                'patience': 5,
+                'cate_embedding_dimension': 50,
+                'dense_units': 50,
+                'dense_numerical_n_layers': 1,
+                'drop_rate': 0.2,
+                'combined_dense_n_layers': 1
+            }
+            np.random.seed(nn_params['nn_seed'])
+
+            model, train_dict, valid_dict, test_dict = \
+                nn_libs.get_model(nn_params, X_train, X_val, X_test, categorical_features)
+
+            from keras.utils import plot_model
+            plot_model(model, to_file='model.png')
+
+            nn_saved_models_path = self.OUTDIR + 'nn_models/'
+            if not os.path.exists(nn_saved_models_path):
+                os.makedirs(nn_saved_models_path)
+            run_id = int(time.time())
+            saved_model_file_name = nn_saved_models_path+'nn_{}.hdf5'.format(run_id)
+
+            cb = [
+                nn_libs.RocAucMetricCallback(validation_data=(valid_dict, y_val)),  # include it before EarlyStopping!
+                EarlyStopping(monitor='roc_auc_val', mode='max', patience=nn_params['patience'], verbose=2),
+                nn_libs.LearningRateTracker(include_on_batch=False),
+                ModelCheckpoint(saved_model_file_name, monitor='roc_auc_val', verbose=1, save_best_only=True, mode='max')
+                # LearningRateScheduler(lambda x: lr * (lr_decay ** x))
+            ]
+            model.fit(train_dict, y_train, validation_data=[valid_dict, y_val],
+                      epochs=nn_params['max_epochs'], batch_size=nn_params['batch_size'], verbose=2, callbacks=cb)
+
+            hist = model.history
+            bst_epoch = np.argmax(hist.history['roc_auc_val'])
+            trn_loss = hist.history['loss'][bst_epoch]
+            trn_acc = hist.history['acc'][bst_epoch]
+            val_loss = hist.history['val_loss'][bst_epoch]
+            val_acc = hist.history['val_acc'][bst_epoch]
+            val_auc = hist.history['roc_auc_val'][bst_epoch]
+
+
+
+
             
-            grid_search.lgb_grid_search(X_train, y_train, X_val, y_val,
-                                         categorical_features, search_rounds=gs_search_rounds, 
-                                         filename_for_gs_results=gs_record, 
-                                         gs_params_gen=self.gs_params_gen,
-                                         cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
-                                         do_preds=gs_do_preds, X_test=X_test,
-                                         preds_save_path=self.OUTDIR+'gs_saved_preds/',
-                                         suppress_warning=gs_sup_warning)
+            # grid_search.lgb_grid_search(X_train, y_train, X_val, y_val,
+            #                              categorical_features, search_rounds=gs_search_rounds,
+            #                              filename_for_gs_results=gs_record,
+            #                              gs_params_gen=self.gs_params_gen,
+            #                              cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
+            #                              do_preds=gs_do_preds, X_test=X_test,
+            #                              preds_save_path=self.OUTDIR+'gs_saved_preds/',
+            #                              suppress_warning=gs_sup_warning)
         #self._renew_status(to_do_dict, 'grid_search', self.OUTDIR + 'todo_list.json')
         
                 

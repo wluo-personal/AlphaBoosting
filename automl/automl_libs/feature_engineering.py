@@ -156,10 +156,10 @@ def cumulative_count(df, cols, dummy_col, generated_feature_name, params=None):
     6	0	1	1
     7	1	1	0
 
-    call: cumulative_count(df, cols=['a'], dummy_col='label', generated_feature_name='cum_count_a_b')
+    call: cumulative_count(df, cols=['a'], dummy_col='label', generated_feature_name='cum_count_a')
 
     returned:
-        cum_count_a_b
+        cum_count_a
     0	0
     1	1
     2	0

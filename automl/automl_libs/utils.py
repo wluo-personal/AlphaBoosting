@@ -64,28 +64,3 @@ def get_time(timezone='America/New_York', time_format='%Y-%m-%d %H:%M:%S'):
     est = utc.astimezone(to_zone)
 
     return est.strftime(time_format)
-
-class FirstClass:
-    def __init__(self):
-        self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
-        self.current_number = 0
-
-    def increment_number(self):
-        self.current_number += 1
-        module_logger.warning('Incrementing number!')
-        module_logger.info('Still incrementing number!!')
-
-    def clear_number(self):
-        self.current_number = 0
-        module_logger.warning('Clearing number!')
-        module_logger.info('Still clearing number!!')
-
-
-def do_something(self):
-    module_logger.info('doing something')
-    a = 1 + 1
-    module_logger.info('done doing something')
-
-
-def some_function():
-    module_logger.info('received a call to "some_function"')
