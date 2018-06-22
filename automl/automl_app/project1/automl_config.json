@@ -8,6 +8,7 @@
     "validation_index": null, 
     "validation_ratio": 0.2,
         
+    "gs_model": "nn",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
@@ -18,7 +19,7 @@
     "gs_verbose_eval": 5,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
-
+        
     
     "_comments": {
         "validation": "validation_index overrules validation_ratio",
