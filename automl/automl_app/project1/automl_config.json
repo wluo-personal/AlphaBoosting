@@ -12,7 +12,6 @@
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_record_filename": "project1_grid_search.csv",
     "gs_search_rounds": 2,
     "gs_cv": true,
     "gs_nfold": 5,
