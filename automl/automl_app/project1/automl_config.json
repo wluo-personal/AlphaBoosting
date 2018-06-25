@@ -3,25 +3,25 @@
     "last_run_record_filename": "last_run_record.json",
     "train_data_url": "data/train.pkl",
     "test_data_url": "data/test.pkl",
-    "down_sampling_amt": 3,
+    "down_sampling_amt": 2,
     "down_sampling_ratio": null, 
     "validation_index": null, 
     "validation_ratio": 0.2,
         
+    "gs_model": "nn",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_record_filename": "project1_grid_search.csv",
-    "gs_search_rounds": 1,
+    "gs_search_rounds": 2,
     "gs_cv": true,
     "gs_nfold": 5,
-    "gs_verbose_eval": 100,
+    "gs_verbose_eval": 5,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
-
+        
     
     "_comments": {
-        "validation": "validation_index overrules validation_ration",
+        "validation": "validation_index overrules validation_ratio",
         "down_sampling_amt": [
             "integer. 0: no downsampling. >0, the amount of downsamplings",
             "Note 1: combine the same positive samples with different negative samples will result in a different downsampling (assume more neg samples then pos samples",

@@ -5,6 +5,7 @@ import pandas as pd
 import logging, gc
 module_logger = logging.getLogger(__name__)
 
+
 def count(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
     count number of each values in specified column in input dataframe.
@@ -64,6 +65,7 @@ def count(df, cols, dummy_col, generated_feature_name, params=None):
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
+
 
 def unique_count(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
@@ -128,6 +130,7 @@ def unique_count(df, cols, dummy_col, generated_feature_name, params=None):
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
 
+
 def cumulative_count(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
     cumulative count number of 
@@ -156,10 +159,10 @@ def cumulative_count(df, cols, dummy_col, generated_feature_name, params=None):
     6	0	1	1
     7	1	1	0
 
-    call: cumulative_count(df, cols=['a'], dummy_col='label', generated_feature_name='cum_count_a_b')
+    call: cumulative_count(df, cols=['a'], dummy_col='label', generated_feature_name='cum_count_a')
 
     returned:
-        cum_count_a_b
+        cum_count_a
     0	0
     1	1
     2	0
@@ -181,6 +184,7 @@ def cumulative_count(df, cols, dummy_col, generated_feature_name, params=None):
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
+
 
 def reverse_cumulative_count(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
@@ -237,6 +241,7 @@ def reverse_cumulative_count(df, cols, dummy_col, generated_feature_name, params
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
 
+
 def variance(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
     variance of a specified column given the unique combinations of other columns.
@@ -269,6 +274,7 @@ def variance(df, cols, dummy_col, generated_feature_name, params=None):
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
+
 
 def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
@@ -310,9 +316,6 @@ def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
-
-
-
 
 # params['n']: n, params['fillna']: fillna, cols[-1]: time
 def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
@@ -385,6 +388,7 @@ def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return result
+
 
 def count_in_previous_n_time_unit(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
@@ -459,6 +463,7 @@ def count_in_previous_n_time_unit(df, cols, dummy_col, generated_feature_name, p
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
+
 
 # cols[-1]: time
 def count_in_next_n_time_unit(df, cols, dummy_col, generated_feature_name, params=None):
