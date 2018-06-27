@@ -7,7 +7,9 @@ from sklearn.svm import SVC
 from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.exceptions import NotFittedError
 from scipy.sparse import csr_matrix, hstack, vstack
 import lightgbm as lgb
 from enum import Enum
@@ -118,18 +120,22 @@ class LightgbmBLE(BaseLayerEstimator):
     You can instead use: SklearnBLE(LGBMClassifier)
     Unless yon need the early stopping function.
     """
-    def __init__(self, params=None, nb=False, seed=0):
+    def __init__(self, params={}, nb=False, seed=0):
         self._nb = nb
         self._seed = seed
-        self.set_params(params)
-    
-    def set_params(self, params):
-        """
-        if need to set params for different labels, let params={} when constructing
-        so you can set seed, and use this one to set params per label
-        """
-        self.params = params
-        self.params['data_random_seed'] = self._seed
+        self._categorical_feature = params.pop('categorical_feature', 'auto')
+        self._num_boost_round = params.pop('num_boost_round', 100)
+        self._train_params = params
+        self._model = None
+        self._r = None
+
+    # def set_params(self, params):
+    #     """
+    #     if need to set params for different labels, let params={} when constructing
+    #     so you can set seed, and use this one to set params per label
+    #     """
+    #     self.params = params
+    #     self._train_params['data_random_seed'] = self._seed
     
     def train(self, x, y, valid_set_percent=0):
         """
@@ -152,32 +158,45 @@ class LightgbmBLE(BaseLayerEstimator):
             if valid_set_percent != 1:
                 x, x_val, y, y_val = train_test_split(x, y, test_size=valid_set_percent)
 
-
-        lgb_train = lgb.Dataset(x, y)
+        lgb_train = lgb.Dataset(x, y, categorical_feature=self._categorical_feature)
         if valid_set_percent != 0:
             if valid_set_percent == 1:
                 print('Evaluating using training set')
-                self.model = lgb.train(self.params, lgb_train, valid_sets=lgb_train)
+                self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_train,
+                                        num_boost_round=self._num_boost_round)
             else:
-                lgb_val = lgb.Dataset(x_val, y_val)
+                lgb_val = lgb.Dataset(x_val, y_val, categorical_feature=self._categorical_feature)
                 print('Evaluating using validation set ({}% of training set)'.format(valid_set_percent*100))
-                self.model = lgb.train(self.params, lgb_train, valid_sets=lgb_val)
+                self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_val,
+                                        num_boost_round=self._num_boost_round)
         else:
             print('No evaluation set, thus not possible to use early stopping. Please train with your best params.')
-            self.model = lgb.train(self.params, lgb_train)
-        
+            self._model = lgb.train(self._train_params, train_set=lgb_train, valid_sets=lgb_train,
+                                    num_boost_round=self._num_boost_round)
         
     def predict(self, x):
         if self._nb:
             x = x.multiply(self._r)
-        if self.model.best_iteration > 0:
-            print('best_iteration {} is chosen.'.format(best_iteration))
-            result = self.model.predict(x, num_iteration=bst.best_iteration)
+        if self._model.best_iteration > 0:
+            print('best_iteration {} is chosen.'.format(self._model.best_iteration))
+            result = self._model.predict(x, num_iteration=self._model.best_iteration)
         else:
-            result = self.model.predict(x)
-        #print('predicting done')
+            result = self._model.predict(x)
         return result
-            
+
+    @property
+    def model_(self):
+        """Get the number of features of fitted model."""
+        if self._model is None:
+            raise NotFittedError('No model found. Need to call train beforehand.')
+        return self._model
+
+    @property
+    def r_(self):
+        """Get the number of features of fitted model."""
+        if self._r is None:
+            raise NotFittedError('_r is not calculated')
+        return self._r
 
 from keras.layers import Dense, Embedding, Input, LSTM, Bidirectional, GlobalMaxPool1D, Dropout, BatchNormalization
 from keras.models import Model
@@ -767,13 +786,14 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=1001, sfm_th
                     x_test = sfm.transform(x_test)
                     print('dimension after selecting: train:{} test:{}'.format(x_train.shape, x_test.shape))
                 else:
-                    x_train = x_train.values  # convert the x_train from dataframe to np.ndarray
+                    x_train = x_train#.values  # convert the x_train from dataframe to np.ndarray
 
                 model = model_pool[model_name]
                 if 'PERLABEL' in str(model_name):
                     model.set_params_for_label(label)
 
                 oof_train, oof_mean_test = get_oof(model, x_train, y_train, x_test, nfolds, seed)
+                pdb.set_trace()
                 model.train(x_train, y_train)
                 est_preds = model.predict(x_test)
 
