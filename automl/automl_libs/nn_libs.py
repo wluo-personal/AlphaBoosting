@@ -13,6 +13,12 @@ module_logger = logging.getLogger(__name__)
 
 
 def get_model(nn_params, X_train, X_val, X_test, categorical_features):
+    """
+    Params:
+        nn_params: dict
+        X_train, X_val, X_test: pandas dataframe
+        categorical_features: list of columns names
+    """
     train_dict = {}
     valid_dict = {}
     test_dict = {}
@@ -25,15 +31,25 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             numerical_features.append(col)
 
     if len(categorical_features) > 0:
+        embed_outdim = nn_params.get('cat_emb_outdim')  # could be a constant or a dict (col name:embed out dim)
         for col in categorical_features:
-            train_dict[col] = np.array(X_train[col])
-            valid_dict[col] = np.array(X_val[col])
-            test_dict[col] = np.array(X_test[col])
-            cat_input = Input(shape=(1,), name=col)
+            # construct data for training, validation and prediction
+            train_dict[str(col)] = np.array(X_train[col])  # in case col is not a string, but say, a number
+            valid_dict[str(col)] = np.array(X_val[col])
+            test_dict[str(col)] = np.array(X_test[col])
+
+            # construct categorical input nodes
+            cat_input = Input(shape=(1,), name=str(col))
             feature_input_list.append(cat_input)
             embed_input_dim = np.max([X_train[col].max(), X_val[col].max(), X_test[col].max()]) + 1
-            embed_output_dimension = nn_params[
-                'cat_emb_outdim']  # np.min([nn_params['cat_emb_outdim'], embed_input_dim])
+            # why +1 in embed_input_dim: because categorical cols are assumed labelencoded, which start from 0
+            # so e.g. if X_train[col].max() returns 3, it means there are 3 + 1 categories: 0,1,2,3
+
+            # parse out the embed out dimension for this column
+            if isinstance(embed_outdim, dict):
+                embed_output_dimension = embed_outdim[col]
+            else:
+                embed_output_dimension = np.min([embed_outdim, embed_input_dim])
             total_cate_embedding_dimension += embed_output_dimension
             module_logger.debug('Col [{}]: embed dim: input {}, output {}'
                                 .format(col, embed_input_dim, embed_output_dimension))
@@ -71,16 +87,23 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
     nn_final_outputs = Dense(1, activation='sigmoid')(x)
     model = Model(inputs=feature_input_list, outputs=nn_final_outputs)
 
-    def exp_decay(init, fin, steps):
-        return (init / fin) ** (1 / (steps - 1)) - 1
+    lr_init = nn_params['lr_init']
+    lr_fin = nn_params['lr_fin']
+    if lr_init != lr_fin:
+        # compute lr decay
+        steps_in_one_epoch = int(len(X_train) / nn_params['batch_size'])
+        steps_for_lr_decay = steps_in_one_epoch * nn_params['ep_for_lr']
 
-    steps_in_one_epoch = int(len(X_train) / nn_params['batch_size'])
-    steps_for_lr_decay = steps_in_one_epoch * nn_params['ep_for_lr']
-    lr_decay = exp_decay(nn_params['lr_init'], nn_params['lr_fin'], steps_for_lr_decay)
-    module_logger.debug('steps in on epoch: {}'.format(steps_in_one_epoch))
-    module_logger.debug('steps for lr decay: {}'.format(steps_for_lr_decay))
-    module_logger.debug('lr decay: {:.6f}'.format(lr_decay))
-    optimizer = Adam(lr=nn_params['lr_init'], decay=lr_decay)
+        def exp_decay(init, fin, steps):
+            return (init / fin) ** (1 / (steps - 1)) - 1
+
+        lr_decay = exp_decay(lr_init, lr_fin, steps_for_lr_decay)
+        module_logger.debug('steps in on epoch: {}'.format(steps_in_one_epoch))
+        module_logger.debug('steps for lr decay: {}'.format(steps_for_lr_decay))
+        module_logger.debug('lr decay: {:.6f}'.format(lr_decay))
+        optimizer = Adam(lr=lr_init, decay=lr_decay)
+    else:
+        optimizer = Adam(lr=lr_init)
 
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     # model.summary()
