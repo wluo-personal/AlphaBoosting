@@ -125,6 +125,7 @@ class LightgbmBLE(BaseLayerEstimator):
         self._seed = seed
         self._categorical_feature = params.pop('categorical_feature', 'auto')
         self._num_boost_round = params.pop('num_boost_round', 100)
+        self._verbose_eval = params.pop('verbose_eval', 1)
         self._train_params = params
         self._model = None
         self._r = None
@@ -163,16 +164,16 @@ class LightgbmBLE(BaseLayerEstimator):
             if valid_set_percent == 1:
                 print('Evaluating using training set')
                 self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_train,
-                                        num_boost_round=self._num_boost_round)
+                                        num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
             else:
                 lgb_val = lgb.Dataset(x_val, y_val, categorical_feature=self._categorical_feature)
                 print('Evaluating using validation set ({}% of training set)'.format(valid_set_percent*100))
                 self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_val,
-                                        num_boost_round=self._num_boost_round)
+                                        num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
         else:
             print('No evaluation set, thus not possible to use early stopping. Please train with your best params.')
             self._model = lgb.train(self._train_params, train_set=lgb_train, valid_sets=lgb_train,
-                                    num_boost_round=self._num_boost_round)
+                                    num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
         
     def predict(self, x):
         if self._nb:
@@ -195,7 +196,7 @@ class LightgbmBLE(BaseLayerEstimator):
     def r_(self):
         """Get the number of features of fitted model."""
         if self._r is None:
-            raise NotFittedError('_r is not calculated')
+            raise NotFittedError('_r is not calculated. check if nb is set to true')
         return self._r
 
 from keras.layers import Dense, Embedding, Input, LSTM, Bidirectional, GlobalMaxPool1D, Dropout, BatchNormalization
@@ -561,11 +562,13 @@ def load_obj(name, filepath):
 
 import copy
 class BaseLayerResultsRepo:
-    def __init__(self, label_cols=['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate'], 
-                 load_from_file=True, filepath='obj/WithPreprocessedFile/'):
+    def __init__(self, label_cols, filepath, load_from_file):
         """
         To start a new repo, set load_from_file to False, and give it a valid filepath so that files can be saved
         To load a save repo, set load_from_file to True, and give it the filepath
+        Params:
+            label_cols: list of labels
+                e.g. multi-classes: ['toxic', 'severe_toxic', 'obscene'] or one-class: ['label']
         """
         self._layer1_oof_train = {}
         self._layer1_oof_test = {}
@@ -719,11 +722,17 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         kf = KFold(n_splits=nfolds, shuffle=shuffle, random_state=seed)
 
     for i, (tr_index, te_index) in enumerate(kf.split(x_train, y_train)):
-        x_tr, x_te = x_train.iloc[tr_index], x_train.iloc[te_index]
+        if type(x_train).__name__ == 'DataFrame':
+            x_tr, x_te = x_train.iloc[tr_index], x_train.iloc[te_index]
+        else:
+            x_tr, x_te = x_train[tr_index], x_train[te_index]
+            print('warning: x_train is not dataframe, '
+                  'be careful if categorical_feature is needed when fitting models like LGB')
         # y_tr, y_te = y_train.iloc[tr_index], y_train.iloc[te_index]
         y_train = np.array(y_train)
         y_tr, y_te = y_train[tr_index], y_train[te_index]
 
+        print('processing fold {}...'.format(i))
         clf.train(x_tr, y_tr)
         oof_train[te_index] = clf.predict(x_te)
         oof_test_kf[i, :] = clf.predict(x_test)
@@ -792,8 +801,11 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=1001, sfm_th
                 if 'PERLABEL' in str(model_name):
                     model.set_params_for_label(label)
 
-                oof_train, oof_mean_test = get_oof(model, x_train, y_train, x_test, nfolds, seed)
-                pdb.set_trace()
+                if nfolds != 0:
+                    oof_train, oof_mean_test = get_oof(model, x_train, y_train, x_test, nfolds, seed)
+                else:
+                    print('nfolds == 0, oof is not performed!')
+                    oof_train, oof_mean_test = None, None
                 model.train(x_train, y_train)
                 est_preds = model.predict(x_test)
 
