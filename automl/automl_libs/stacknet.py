@@ -1,9 +1,12 @@
 from automl_libs.base_layer_utils import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
 from automl_libs.base_layer_utils import SklearnBLE, LightgbmBLE
-from automl_libs.base_layer_utils import compute_layer1_oof
+from automl_libs.base_layer_utils import compute_layer1_oof, compute_layer2_oof
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
 import pandas as pd
 from os import listdir
 import pdb
+import time
 import logging, gc
 module_logger = logging.getLogger(__name__)
 
@@ -15,16 +18,14 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, gs_result_pa
         test: DataFrame without label
         categorical_cols: list of column names
         feature_cols: list of column names
-        label_cols: list of column names (multi-classes) or column name (single-class)
+        label_cols: list of column names (multi-classes or single-class)
+            e.g. ['label'] or ['label1', 'label2']
     """
     # for debug purpose, read in testY
     import numpy as np
     testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
 
     X_train_ordinal = train[feature_cols]  # still df
-    # convert label_cols to list so that y_train will be a dataframe, which is required in BaseLayerDataRepo
-    if not isinstance(label_cols, list):
-        label_cols = [label_cols]
     y_train = train[label_cols]  # make sure it's df
     X_test_ordinal = test[feature_cols] # still df
 
@@ -52,7 +53,7 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, gs_result_pa
         for model_data in base_layer_results_repo.get_model_data_id_list():
             result_index = int(model_data.split('__')[0])
             if chosen_res_dict.pop(result_index, None) is not None:
-                module_logger.debug('{} already processed in StackNet, so poped it from chosen_gs_results'.format(result_index))
+                module_logger.debug('{} already processed in StackNet, so removed it from chosen_gs_results'.format(result_index))
 
     model_pool = {}
     if len(chosen_res_dict) > 0:
@@ -67,9 +68,8 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, gs_result_pa
         layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, model_data_id_list = \
             compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, sfm_threshold=None)
 
-        from sklearn.metrics import roc_auc_score
         for k, v in layer1_est_preds.items():
-            print(k, roc_auc_score(testY, v))
+            print('roc of test', k, roc_auc_score(testY, v))
 
         base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds, model_data_id_list)
 
@@ -79,4 +79,29 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, gs_result_pa
             base_layer_results_repo.add_score(model_data, val_score)
 
         base_layer_results_repo.save()
-        pdb.set_trace()
+
+
+def layer2(train, label_cols):
+    """
+    Params:
+        train: DataFrame with label
+        label_cols: list of column names (multi-classes or single-class)
+            e.g. ['label'] or ['label1', 'label2']
+
+    """
+    oof_path = '/home/kai/data/shiyi/AlphaBoosting/automl/automl_app/project1/output/oof/'
+    base_layer_results_repo = BaseLayerResultsRepo(label_cols=label_cols, filepath=oof_path, load_from_file=True)
+    print(base_layer_results_repo.show_scores())
+    model_pool = {}
+    layer2_inputs = {}
+    model_name = str(int(time.time()))+'__'+ModelName.LOGREG.name
+    model_pool[model_name] = SklearnBLE(LogisticRegression)
+    layer2_inputs[model_name] = base_layer_results_repo.get_results(threshold=0.7)
+    layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_model_data_list = \
+        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018)
+
+    # for debug purpose, read in testY
+    import numpy as np
+    testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
+    for k, v in layer2_est_preds.items():
+        print('roc of test', k, roc_auc_score(testY, v))

@@ -12,7 +12,7 @@
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_search_rounds": 2,
+    "gs_search_rounds": 3,
     "gs_cv": false,
     "gs_nfold": 5,
     "gs_verbose_eval": 20,
