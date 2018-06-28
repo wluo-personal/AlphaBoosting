@@ -124,7 +124,7 @@ class LightgbmBLE(BaseLayerEstimator):
         self._nb = nb
         self._seed = seed
         self._categorical_feature = params.pop('categorical_feature', 'auto')
-        self._num_boost_round = params.pop('num_boost_round', 100)
+        self._num_boost_round = params.pop('best_round', 100)
         self._verbose_eval = params.pop('verbose_eval', 1)
         self._train_params = params
         self._model = None
@@ -412,13 +412,14 @@ class BaseLayerDataRepo():
     
     def add_data(self, data_id, x_train, x_test, y_train, label_cols, compatible_models, rnn_data=False):
         """
-        x_train, x_test: dataframe
-        # x_train, x_test: nparray. use .values.reshape(-1,1) to convert pd.Series to nparray
-        y_train: pd df, with columns names = label columns
-        label_cols: list of str. label column names
-        compatible_models: list of ModelName. The intented models that will use this dataset.
-            e.g. [ModelName.LGB, ModelName.LOGREG]
-        rnn_data: Boolean. Whether this data is for RNN
+        Params:
+            x_train, x_test: dataframe
+            # x_train, x_test: nparray. use .values.reshape(-1,1) to convert pd.Series to nparray
+            y_train: pd df, with columns names = label columns
+            label_cols: list of str. label column names
+            compatible_models: list of ModelName. The intented models that will use this dataset.
+                e.g. [ModelName.LGB, ModelName.LOGREG]
+            rnn_data: Boolean. Whether this data is for RNN
         """
         data_dict = {
             'data_id': data_id,
@@ -434,7 +435,8 @@ class BaseLayerDataRepo():
             # label_dict = {}
             # for col in label_cols:
             #     label_dict[col] = y_train[col]
-            data_dict['y_train'] = y_train.to_dict('list')# hence y_train is a dict with labels as keys
+            data_dict['y_train'] = y_train.to_dict('list')
+            # hence data_dict['y_train'] will be a dict with labels as keys
 
         self._data_repo[data_id] = data_dict
 
@@ -770,7 +772,9 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=1001, sfm_th
     #     layer1_oof_train[label] = []
     #     layer1_oof_test[label] = []
         for model_name in model_pool.keys():
-            for data in bldr.get_data_by_compatible_model(model_name):
+            # model_name is 1530220352__LGB, so model_id will be LGB, not the number
+            model_id = model_name.split('__')[1]
+            for data in bldr.get_data_by_compatible_model(model_id):
 
                 model_data_id = '{}_{}'.format(model_name, data['data_id'])
                 current_run = 'label: {:12s} model_data_id: {}'.format(label, model_data_id)

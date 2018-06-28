@@ -1,5 +1,6 @@
 import time
 import os
+import gc
 from datetime import timedelta
 import pandas as pd
 import numpy as np
@@ -66,24 +67,27 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
     run_id = int(time.time())  # also works as the index of the result dataframe
 
-    lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
-
-    lgb_val = lgb.Dataset(X_val, y_val, categorical_feature=categorical_feature)
-
     # import pprint
     # pp = pprint.PrettyPrinter(indent=4)
     # pp.pprint(lgb_params)
     lgb_params['timestamp'] = utils.get_time()
     gs_start_time = time.time()
     if cv:
+        # use ALL data to do cv
+        lgb_train = lgb.Dataset(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]),
+                                categorical_feature=categorical_feature)
         eval_hist = lgb.cv(lgb_params, lgb_train, nfold=nfold,
                            categorical_feature=categorical_feature, verbose_eval=verbose_eval, seed=seed)
-        best_rounds = len(eval_hist[metric + '-mean'])
-        lgb_params['best_round'] = best_rounds
+        del lgb_train; gc.collect()
+        best_round = len(eval_hist[metric + '-mean'])
+        lgb_params['best_round'] = best_round
         lgb_params['val_' + metric] = eval_hist[metric + '-mean'][-1]
         lgb_params['cv'] = True
     else:
+        lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
+        lgb_val = lgb.Dataset(X_val, y_val, categorical_feature=categorical_feature)
         model = lgb.train(lgb_params, lgb_train, valid_sets=[lgb_train, lgb_val], verbose_eval=verbose_eval)
+        del lgb_train, lgb_val; gc.collect()
         lgb_params['best_round'] = model.best_iteration
         lgb_params['val_' + metric] = model.best_score['valid_1'][metric]
         lgb_params['train_' + metric] = model.best_score['training'][metric]
@@ -95,11 +99,13 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     if do_preds:
         predict_start_time = time.time()
         module_logger.debug('[do_preds] is True, generating predictions ...')
-        if cv:
-            module_logger.debug('Retrain model using cv params and all data...')
-            lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
-            model = lgb.train(lgb_params, lgb_train, valid_sets=lgb_train,
-                              num_boost_round=best_rounds, verbose_eval=int(0.2 * best_rounds))
+        module_logger.debug('Retrain model using best_round and all data...')
+        best_round = lgb_params['best_round']
+        lgb_all_data = lgb.Dataset(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]),
+                                   categorical_feature=categorical_feature)
+        model = lgb.train(lgb_params, lgb_all_data, valid_sets=lgb_all_data,
+                          num_boost_round=best_round, verbose_eval=int(0.2 * best_round))
+        del lgb_all_data; gc.collect()
         y_test = model.predict(X_test)
         np.save(preds_save_path + 'lgb_preds_{}'.format(run_id), y_test)
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))

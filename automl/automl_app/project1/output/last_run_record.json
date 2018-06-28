@@ -1,10 +1,10 @@
 {
-    "down_sampling_amt": 2,
+    "down_sampling_amt": 0,
     "down_sampling_ratio": null,
     "label": "label",
     "project_root": "./",
-    "test_data_url": "data/test.pkl",
-    "train_data_url": "data/train.pkl",
+    "test_data_url": "data/testX_100k.pkl",
+    "train_data_url": "data/train_1M.pkl",
     "validation_index": "./temp_data/val_index.pkl",
-    "validation_ratio": 0.2
+    "validation_ratio": 0.1
 }

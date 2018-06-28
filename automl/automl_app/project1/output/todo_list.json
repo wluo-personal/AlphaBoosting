@@ -1,8 +1,9 @@
 {
-    "concat_test": true,
-    "feature_engineering": true,
-    "grid_search": false,
-    "val_downsample_generate_index": true,
-    "val_downsample_generation": true,
-    "val_downsample_split": true
+    "CONCAT_DATA": true,
+    "FEATURE_ENGINEERING": true,
+    "GRID_SEARCH": true,
+    "STACKNET": false,
+    "VALIDATION_DOWNSAMPLING_GEN": true,
+    "VALIDATION_DOWNSAMPLING_GEN_INDEX": true,
+    "VALIDATION_DOWNSAMPLING_SPLIT": true
 }

@@ -1,27 +1,28 @@
 {
     "project_root": "./",
     "last_run_record_filename": "last_run_record.json",
-    "train_data_url": "data/train.pkl",
-    "test_data_url": "data/test.pkl",
-    "down_sampling_amt": 2,
+    "train_data_url": "data/train_1M.pkl",
+    "test_data_url": "data/testX_100k.pkl",
+    "down_sampling_amt": 0,
     "down_sampling_ratio": null, 
     "validation_index": null, 
-    "validation_ratio": 0.2,
+    "validation_ratio": 0.1,
         
     "gs_model": "lgb",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
     "gs_search_rounds": 2,
-    "gs_cv": true,
+    "gs_cv": false,
     "gs_nfold": 5,
-    "gs_verbose_eval": 1,
+    "gs_verbose_eval": 20,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
     
     "_comments": {
         "validation": "validation_index overrules validation_ratio",
+        "validation_ratio" : "range(exclusive): (0,1)",
         "down_sampling_amt": [
             "integer. 0: no downsampling. >0, the amount of downsamplings",
             "Note 1: combine the same positive samples with different negative samples will result in a different downsampling (assume more neg samples then pos samples",
