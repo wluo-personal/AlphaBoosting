@@ -13,7 +13,7 @@ module_logger = logging.getLogger(__name__)
 
 def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
        gs_record_dir, gs_params_gen, gs_model, cv, nfold,
-       verbose_eval, do_preds, X_test, preds_save_path, suppress_warning):
+       verbose_eval, do_preds, X_test, preds_save_path, suppress_warning, **kwargs):
 
     if suppress_warning:
         import warnings
@@ -140,13 +140,17 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
     saved_model_file_name = nn_saved_models_path + 'nn_{}.hdf5'.format(run_id)
 
     pred_batch_size = nn_params['pred_batch_size']
-    cb = [
-        nn_libs.RocAucMetricCallback(validation_data=(valid_dict, y_val), predict_batch_size=pred_batch_size),  # include it before EarlyStopping!
-        EarlyStopping(monitor='roc_auc_val', mode='max', patience=nn_params['patience'], verbose=2),
+    cb = []
+    if nn_params['monitor'] == 'val_auc':
+        # include the following before EarlyStopping
+        cb.append(nn_libs.RocAucMetricCallback(validation_data=(valid_dict, y_val),
+                                               predict_batch_size=pred_batch_size))
+    cb.extend([
+        EarlyStopping(monitor=nn_params['monitor'], mode=nn_params['mode'], patience=nn_params['patience'], verbose=2),
         nn_libs.LearningRateTracker(include_on_batch=False),
         ModelCheckpoint(saved_model_file_name, monitor='roc_auc_val', verbose=1, save_best_only=True, mode='max')
         # LearningRateScheduler(lambda x: lr * (lr_decay ** x))
-    ]
+    ])
     model.fit(train_dict, y_train, validation_data=[valid_dict, y_val],
               epochs=nn_params['max_ep'], batch_size=nn_params['batch_size'], verbose=verbose_eval, callbacks=cb)
 
@@ -157,6 +161,7 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
     val_loss = hist.history['val_loss'][bst_epoch]
     val_acc = hist.history['val_acc'][bst_epoch]
     val_auc = hist.history['roc_auc_val'][bst_epoch]
+    nn_params['best_epoch'] = bst_epoch + 1
     nn_params['trn_loss'] = trn_loss
     nn_params['trn_acc'] = trn_acc
     nn_params['val_loss'] = val_loss

@@ -288,13 +288,19 @@ class AlphaBoosting:
 
     def _stacknet(self, to_do_dict):
         if not to_do_dict[self.Stage.STACKNET.name]:
+            # seems need absolute path to save
+            oof_path = self.OUTDIR + 'oof/'
+            if not os.path.exists(oof_path):
+                os.makedirs(oof_path)
+            gs_result_path = self.OUTDIR
             train, val, test, categorical_features, feature_cols, label_cols = self._get_final_data()
-            # convert label_cols to list so that y_train will be a dataframe, which is required in BaseLayerDataRepo
+            # convert label_cols to list so that y_train will be a dataframe, which is required stacknet layers
             if not isinstance(label_cols, list):
                 label_cols = [label_cols]
-            train = pd.concat([train, val]).head(500000) ######################################################################
-            stacknet.layer1(train, test, categorical_features, feature_cols, label_cols)
-            stacknet.layer2(train, label_cols)
+            train = pd.concat([train, val])
+            stacknet.layer1(train, test, categorical_features, feature_cols, label_cols,
+                            self.config_dict['oof_nfolds'], oof_path, gs_result_path)
+            stacknet.layer2(train, label_cols, oof_path)
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
 
@@ -311,6 +317,7 @@ class AlphaBoosting:
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
+        train = train.head(50000) #########################################################
         return train, val, test, categorical_features, feature_cols, label_col
 
         

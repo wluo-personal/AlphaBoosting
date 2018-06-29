@@ -6,19 +6,20 @@
     "down_sampling_amt": 0,
     "down_sampling_ratio": null, 
     "validation_index": null, 
-    "validation_ratio": 0.1,
+    "validation_ratio": 0.2,
         
-    "gs_model": "lgb",
+    "gs_model": "nn",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_search_rounds": 3,
+    "gs_search_rounds": 1,
     "gs_cv": false,
     "gs_nfold": 5,
     "gs_verbose_eval": 20,
-    "gs_do_preds": true,
+    "gs_do_preds": false,
     "gs_suppress_warning": true,
         
+    "oof_nfolds": 5,
     
     "_comments": {
         "validation": "validation_index overrules validation_ratio",
