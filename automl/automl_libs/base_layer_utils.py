@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from scipy.sparse import csr_matrix, hstack, vstack
@@ -6,7 +7,7 @@ from enum import Enum
 import pickle
 import copy
 import logging
-from automl_libs import stack_layer_estimator as sle
+from automl_libs.stack_layer_estimator import NNBLE, SklearnBLE
 module_logger = logging.getLogger(__name__)
 import pdb
 
@@ -214,6 +215,7 @@ class BaseLayerResultsRepo:
             label_cols: list of labels
                 e.g. multi-classes: ['toxic', 'severe_toxic', 'obscene'] or one-class: ['label']
         """
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self._layer1_oof_train = {}
         self._layer1_oof_test = {}
         for label in label_cols:
@@ -226,7 +228,7 @@ class BaseLayerResultsRepo:
         self.filepath = filepath
         self._save_lock = False # will be set to True if remove() is invoked successfully
         if load_from_file:
-            print('load from file')
+            self.logger.debug('load StackNet saves from file')
             self._layer1_oof_train = load_obj('models_layer1_oof_train', self.filepath)
             self._layer1_oof_test = load_obj('models_layer1_oof_test', self.filepath)
             self._base_layer_est_preds = load_obj('models_base_layer_est_preds', self.filepath)
@@ -244,7 +246,7 @@ class BaseLayerResultsRepo:
         assert len(list(layer1_oof_test)) == len(self._label_cols)
         assert set(list(layer1_oof_test)) - set(self._label_cols) == set()
         for label in self._label_cols:
-            len(layer1_oof_train[label]) == len(layer1_oof_test[label]) == len(list(base_layer_est_preds))
+            assert len(layer1_oof_train[label]) == len(layer1_oof_test[label]) == len(list(base_layer_est_preds))
         assert type(base_layer_est_preds) == dict
         assert type(model_data_id_list) == list
         assert set(list(base_layer_est_preds)) - set(model_data_id_list) == set()
@@ -266,8 +268,8 @@ class BaseLayerResultsRepo:
         if model_data_id not in set(self._model_data_id_list):
             raise ValueError('{} not in the repo. please add it first'.format(model_data_id))
         if model_data_id in set(self._model_data_id_list):
-            print('{} already existed in the repo. score: {} update to {}'\
-                  .format(model_data_id, self._base_layer_est_scores[model_data_id], score))
+            self.logger.debug('{} already existed in the repo. score: {} update to {}'
+                              .format(model_data_id, self._base_layer_est_scores[model_data_id], score))
         self._base_layer_est_scores[model_data_id] = score
     
     def show_scores(self):
@@ -276,8 +278,8 @@ class BaseLayerResultsRepo:
             list of (name, score) tuple in sorted order by score
         """
         sorted_list_from_dict = sorted(self._base_layer_est_scores.items(), key=lambda x:x[1], reverse=True)
-        for key, value in sorted_list_from_dict:
-            print('{}\t{}'.format(value, key))
+        # for key, value in sorted_list_from_dict:
+        #     print('{}\t{}'.format(value, key))
         return sorted_list_from_dict
     
     def get_results(self, threshold=None, chosen_ones=None):
@@ -322,8 +324,6 @@ class BaseLayerResultsRepo:
             return r1, r2, r3
     
     def remove(self, model_data_id):
-        #import pdb
-        #pdb.set_trace()
         mdid_index = self._model_data_id_list.index(model_data_id)
         self._model_data_id_list.pop(mdid_index)
         self._base_layer_est_preds.pop(model_data_id)
@@ -338,8 +338,9 @@ class BaseLayerResultsRepo:
             
     def save(self):
         if self._save_lock:
-            print('save function is locked due to some results removed from the repo. \
-            If you are sure about these changes, call unlock_save() to unlock the save function and save again.')
+            self.logger.warning('save function is locked due to some results removed from the repo. '
+                                'If you are sure about these changes, call unlock_save() to unlock '
+                                'the save function and save again.')
         else:
             save_obj(self._model_data_id_list, 'models_model_data_id_list', self.filepath)
             save_obj(self._layer1_oof_train, 'models_layer1_oof_train', self.filepath)
@@ -367,18 +368,23 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         kf = KFold(n_splits=nfolds, shuffle=shuffle, random_state=seed)
 
     for i, (tr_index, te_index) in enumerate(kf.split(x_train, y_train)):
-        if type(x_train).__name__ == 'DataFrame':
+        if isinstance(x_train, pd.DataFrame):  # if type(x_train).__name__ == 'DataFrame':
             x_tr, x_te = x_train.iloc[tr_index], x_train.iloc[te_index]
         else:
             x_tr, x_te = x_train[tr_index], x_train[te_index]
-            module_logger.debug('warning: x_train is not dataframe, '
-                                'be careful if categorical_feature is needed when fitting models like LGB')
+            try:
+                clf_name = clf.clf.__name__
+            except:
+                clf_name = type(clf).__name__
+            module_logger.warning('warning: x_train is not dataframe, '
+                                  'you should NOT use models like LGB and NN where categorical_feature is needed '
+                                  '(you are using {})'.format(clf_name))
         # y_tr, y_te = y_train.iloc[tr_index], y_train.iloc[te_index]
         y_train = np.array(y_train)
         y_tr, y_te = y_train[tr_index], y_train[te_index]
 
         module_logger.debug('processing fold {} of {}...'.format(i, nfolds))
-        if isinstance(clf, sle.NNBLE):
+        if type(clf).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
             clf.train(x_tr, y_tr, x_te, y_te, x_test)
             y_pred_of_the_fold = clf.predict('x_te')
             y_pred_of_test = clf.predict('x_test')
@@ -391,6 +397,8 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         oof_train[te_index] = y_pred_of_the_fold
         if metrics_callback is not None:
             module_logger.debug('metric of fold {}: {}'.format(i, metrics_callback(y_te, y_pred_of_the_fold)))
+            # TODO:
+            # store scores in a report (layer1 model_data's metric on cv (need to combine all folds metric)
 
         y_pred_of_test = np.array(y_pred_of_test).reshape(-1,)
         oof_test_kf[i, :] = y_pred_of_test
@@ -434,14 +442,15 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
             for data in bldr.get_data_by_compatible_model(model_id):
 
                 model_data_id = '{}_{}'.format(model_name, data['data_id'])
-                current_run = 'label: {:12s} model_data_id: {}'.format(label, model_data_id)
-                print('Computing... '+current_run)
+                current_run = 'label: {:8s} model_data_id: {}'.format(label, model_data_id)
+                module_logger.debug('Computing layer1: '+current_run)
 
                 x_train = data['x_train']  # x_train: dataframe
                 y_train = data['y_train'][label]  # y_train: list
                 x_test = data['x_test']
 
                 if sfm_threshold is not None:
+                    raise ValueError('sfm not implemented yet')
                     # after perform this, dataframe is converted to np.ndarray, so 'category'
                     # type column info is lost.
                     from sklearn.linear_model import LogisticRegression
@@ -459,15 +468,13 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
                 if 'PERLABEL' in str(model_name):
                     model.set_params_for_label(label)
 
-                # if nfolds != 0:
-                #     oof_train, oof_mean_test = get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
-                #                                        stratified=True, seed=seed, metrics_callback=metrics_callback)
-                # else:
-                #     print('nfolds == 0, oof is not performed!')
-                #     oof_train, oof_mean_test = None, None
+                if nfolds != 0:
+                    oof_train, oof_mean_test = get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
+                                                       stratified=True, seed=seed, metrics_callback=metrics_callback)
+                else:
+                    raise ValueError('nfolds of oof can NOT be 0!')
 
-                pdb.set_trace()
-                if isinstance(model, sle.NNBLE):
+                if type(model).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
                     model.train(x_train, y_train, None, None, x_test)
                     est_preds = model.predict('x_test')
                 else:
@@ -508,7 +515,7 @@ def combine_layer_oof_per_label(layer1_oof_dict, label):
     return x
 
 
-def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed):
+def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed, metric):
     """
     Params:
         model_pool: dict. key: an option from ModelName. value: A model
@@ -532,7 +539,7 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
     layer2_model_data_list = []
 
     for model_name in model_pool.keys():
-        print('Generating Layer2 model {} OOF'.format(model_name))
+        module_logger.info('Generating Layer2 model {} OOF'.format(model_name))
         for i, label in enumerate(label_cols):
             #assert train.shape[0] == 159571
 
@@ -552,7 +559,16 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             layer2_oof_test[label].append(oof_test)
 
             model_id = '{}_{}'.format(model_name, 'layer2')
-            model.train(x_train, train[label])
+            if type(model).__name__ == SklearnBLE.__name__:  # if isinstance(model, SklearnBLE):
+                if metric == 'auc':
+                    metric = 'roc_auc'
+                scores = model.cv(x_train, train[label], nfolds=5, scoring=metric)
+                scores = np.mean(scores)
+                module_logger.info('Layer2 {} | {}: {}'.format(model_name, metric, scores))
+                # TODO:
+                # store scores in a report (layer2 model_data's metric on cv)
+            else:
+                model.train(x_train, train[label])
             est_preds = model.predict(x_test)
 
             if model_id not in layer2_est_preds:

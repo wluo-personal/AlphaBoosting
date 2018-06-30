@@ -260,7 +260,7 @@ class AlphaBoosting:
         stage = self.Stage.GRID_SEARCH.name
         if not to_do_dict[stage]:
             train, val, test, categorical_features, feature_cols, label_col = self._get_final_data()
-            X_train = train[feature_cols] ##################################################
+            X_train = train[feature_cols]
             y_train = train[label_col]
             X_val = val[feature_cols]
             y_val = val[label_col]
@@ -299,8 +299,10 @@ class AlphaBoosting:
                 label_cols = [label_cols]
             train = pd.concat([train, val])
             stacknet.layer1(train, test, categorical_features, feature_cols, label_cols,
-                            self.config_dict['oof_nfolds'], oof_path, gs_result_path)
-            stacknet.layer2(train, label_cols, oof_path)
+                            top_n_gs=self.config_dict['top_n_gs'],
+                            oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
+                            metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
+            stacknet.layer2(train, label_cols, oof_path, metric=self.config_dict['report_metric'])
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
 
@@ -317,7 +319,9 @@ class AlphaBoosting:
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
-        train = train.head(50000) #########################################################
+        train = train.head(500000)
+        # TODO:
+        # remove .head(X)
         return train, val, test, categorical_features, feature_cols, label_col
 
         

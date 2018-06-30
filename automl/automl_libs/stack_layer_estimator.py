@@ -6,6 +6,7 @@ from sklearn.svm import LinearSVC, SVC
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.exceptions import NotFittedError
+from sklearn.model_selection import cross_val_score
 from scipy.sparse import csr_matrix, hstack, vstack
 from keras.layers import Dense, Embedding, Input, LSTM, Bidirectional, GlobalMaxPool1D, Dropout, BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -46,7 +47,8 @@ class SklearnBLE(BaseLayerEstimator):
         Note:
             1. If need to set params for different labels, let params={} when constructing
                 so you can set seed, then use set_params() to set params per label
-            2. For estimators like Linear SVC, CalibratedClassifierCV is needed
+            2. per_label_params: dict. key: label. value: params for the label
+            3. For estimators like Linear SVC, CalibratedClassifierCV is needed
         """
         self.clf = clf
         self._nb = nb
@@ -55,24 +57,38 @@ class SklearnBLE(BaseLayerEstimator):
         self._seed = seed
         self.params = params
         self._need_calibrated_classifier_cv = need_calibrated_classifier_cv
+        self._init_model()
+
+    def _init_model(self):
+        if self._need_calibrated_classifier_cv:
+            self.model = CalibratedClassifierCV(self.clf(**self.params))
+        else:
+            self.model = self.clf(**self.params)
 
     def set_params_for_label(self, label):
         """
-        if need to set params for different labels, let params={} when constructing
-        so you can set seed, and use this one to set params per label
+        if need to set params for different labels, let params={} when constructing,
+        pass in per_label_params, and use this method to set params per label
         """
         self.params = self.per_label_params[label]
         self.params['random_state'] = self._seed
+        self._init_model()
 
     def train(self, x, y):
         if self._nb:
             self._r = self._calculate_nb(x, y.values)
             x = x.multiply(self._r)
-        if self._need_calibrated_classifier_cv:
-            self.model = CalibratedClassifierCV(self.clf(**self.params))
-        else:
-            self.model = self.clf(**self.params)
         self.model.fit(x, y)
+
+    def cv(self, x, y, nfolds=5, scoring=None):
+        """
+        Available scoring: http://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter
+        """
+        if scoring is not None:
+            score = cross_val_score(self.model, x, y, cv=nfolds, scoring=scoring)
+        else:
+            score = cross_val_score(self.model, x, y, cv=nfolds)
+        return score
 
     def predict(self, x):
         if self._nb:
@@ -173,6 +189,7 @@ class NNBLE(BaseLayerEstimator):
         self._categorical_feature = params.pop('categorical_feature')
         self._best_epoch = params.pop('best_epoch')
         self._verbose_eval = params.pop('verbose_eval', 1)
+        self._pred_batch_size = params.pop('pred_batch_size')
         self._params = params
         self._model = None
         self._te_dict = None
@@ -181,17 +198,18 @@ class NNBLE(BaseLayerEstimator):
     def train(self, x_tr, y_tr, x_te, y_te, x_test):
         """
         Params:
-            x_tr: np/scipy/ 2-d array or matrix
-            y_tr: pandas series
-            x_te: validation x
-            y_te: validation y. if None, then no validation, and x_te will be ignored
-            x_test: real test data
+            x_tr: df. train
+            y_tr: array-like. Will be converted to np array of shape (N,)
+            x_te: df. validation x
+            y_te: array-like. validation y. if None, then no validation, and x_te will be ignored
+            x_test: df. real test data
         """
         self._model, tr_dict, self._te_dict, self._test_dict = \
             nn_libs.get_model(self._params, x_tr, x_te, x_test, self._categorical_feature)
         val_data = []
         if y_te is not None:
             val_data = [self._te_dict, y_te]
+        y_tr = np.array(y_tr).reshape(-1,)
         self._model.fit(tr_dict, y_tr, validation_data=val_data, epochs=self._best_epoch,
                         batch_size=self._params['batch_size'], verbose=self._verbose_eval)
 
@@ -203,9 +221,9 @@ class NNBLE(BaseLayerEstimator):
                 x_test: predict x_test
         """
         if case == 'x_te':
-            return self._model.predict(self._te_dict, verbose=self._verbose_eval)
+            return self._model.predict(self._te_dict, batch_size=self._pred_batch_size, verbose=self._verbose_eval)
         elif case == 'x_test':
-            return self._model.predict(self._test_dict, verbose=self._verbose_eval)
+            return self._model.predict(self._test_dict, batch_size=self._pred_batch_size, verbose=self._verbose_eval)
 
     @property
     def model_(self):

@@ -11,7 +11,7 @@ import logging, gc
 module_logger = logging.getLogger(__name__)
 
 
-def layer1(train, test, categorical_cols, feature_cols, label_cols, oof_nfolds, oof_path, gs_result_path=''):
+def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs, oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     Params:
         train: DataFrame with label
@@ -20,11 +20,8 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, oof_nfolds, 
         feature_cols: list of column names
         label_cols: list of column names (multi-classes or single-class) (required by BaseLayerDataRepo)
             e.g. ['label'] or ['label1', 'label2']
+        top_n_gs: int. choose top N from grid search results of each model
     """
-    # for debug purpose, read in testY
-    import numpy as np
-    testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-
     X_train_ordinal = train[feature_cols]  # still df
     y_train = train[label_cols]  # make sure it's df
     X_test_ordinal = test[feature_cols] # still df
@@ -36,13 +33,17 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, oof_nfolds, 
     #               [ModelName.LOGREG, ModelName.XGB])
     module_logger.debug(bldr)
 
+    metrics_callback = None
+    if metric == 'roc_auc':
+        metrics_callback = roc_auc_score
+
     # may be search gs result path and find all result files?
     for filename in listdir(gs_result_path):
         if '_grid_search' in filename:
             model_type = filename.split('_')[0]  # LGB, NN, etc...
             gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0').sort_values(by=['val_auc'], ascending=False)
             gs_res_dict = gs_res.T.to_dict()
-            chosen_res_dict = gs_res.head(5).T.to_dict()  ########################
+            chosen_res_dict = gs_res.head(top_n_gs).T.to_dict()
 
             if len(listdir(oof_path)) != 0:
                 load_from_file = True
@@ -75,22 +76,26 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, oof_nfolds, 
 
                 layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, model_data_id_list = \
                     compute_layer1_oof(bldr, model_pool, label_cols, nfolds=oof_nfolds,
-                                       sfm_threshold=None, metrics_callback=roc_auc_score)
+                                       sfm_threshold=None, metrics_callback=metrics_callback)
 
+                # for debug purpose, read in testY  ########################################
+                import numpy as np
+                testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
                 for k, v in layer1_est_preds.items():
-                    print('roc of test', k, roc_auc_score(testY, v))
+                    module_logger.warning('DEBUG: roc of test {}: {}'.format(k, roc_auc_score(testY, v)))
+                # for debug purpose, read in testY  ########################################
 
                 base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds, model_data_id_list)
 
                 for model_data in model_data_id_list:
                     result_index = int(model_data.split('__')[0])
-                    val_score = gs_res_dict[result_index]['val_auc']
+                    val_score = gs_res_dict[result_index]['val_auc']  # TODO: not hard coding
                     base_layer_results_repo.add_score(model_data, val_score)
 
                 base_layer_results_repo.save()
 
 
-def layer2(train, label_cols, oof_path):
+def layer2(train, label_cols, oof_path, metric):
     """
     Params:
         train: DataFrame with label
@@ -99,14 +104,15 @@ def layer2(train, label_cols, oof_path):
 
     """
     base_layer_results_repo = BaseLayerResultsRepo(label_cols=label_cols, filepath=oof_path, load_from_file=True)
-    print(base_layer_results_repo.show_scores())
+    module_logger.info('All available layer1 model_data:')
+    module_logger.info(base_layer_results_repo.show_scores())
     model_pool = {}
     layer2_inputs = {}
     model_name = str(int(time.time()))+'__'+ModelName.LOGREG.name
     model_pool[model_name] = SklearnBLE(LogisticRegression)
     layer2_inputs[model_name] = base_layer_results_repo.get_results(threshold=0.7)
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018)
+        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018, metric=metric)
 
     # for debug purpose, read in testY
     import numpy as np
