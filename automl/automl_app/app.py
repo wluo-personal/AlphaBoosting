@@ -320,7 +320,7 @@ class AlphaBoosting:
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
-        train = train.head(500000)
+        train = train.head(100000)
         # TODO:
         # remove .head(X)
         return train, val, test, categorical_features, feature_cols, label_col

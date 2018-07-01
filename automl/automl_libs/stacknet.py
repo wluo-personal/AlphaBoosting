@@ -1,6 +1,7 @@
 from automl_libs import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
 from automl_libs import SklearnBLE, LightgbmBLE, NNBLE
 from automl_libs import compute_layer1_oof, compute_layer2_oof
+from automl_libs import utils
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import roc_auc_score
@@ -54,7 +55,7 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
             if load_from_file:
                 # remove already processed gs results
                 for model_data in base_layer_results_repo.get_model_data_id_list():
-                    result_index = int(model_data.split('__')[0])
+                    result_index = model_data.split('__')[0]
                     if chosen_res_dict.pop(result_index, None) is not None:
                         module_logger.debug('{} already processed in StackNet, so removed it from chosen_gs_results'.format(result_index))
 
@@ -78,13 +79,6 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
                     compute_layer1_oof(bldr, model_pool, label_cols, nfolds=oof_nfolds,
                                        sfm_threshold=None, metrics_callback=metrics_callback)
 
-                # for debug purpose, read in testY  ########################################
-                import numpy as np
-                testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-                for k, v in layer1_est_preds.items():
-                    module_logger.warning('DEBUG: roc of test {}: {}'.format(k, roc_auc_score(testY, v)))
-                # for debug purpose, read in testY  ########################################
-
                 base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds,
                                             layer1_cv_score, model_data_id_list)
 
@@ -92,10 +86,16 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
                 # needs to be done after the [add] function, which stores
                 # model_data into the repo.
                 for model_data in model_data_id_list:
-                    result_index = int(model_data.split('__')[0])
+                    result_index = model_data.split('__')[0]
                     val_score = gs_res_dict[result_index]['val_'+metric]
                     base_layer_results_repo.add_score(model_data, val_score)
                     base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
+
+                # for debug purpose, read in testY  # TODO, remove after development
+                import numpy as np
+                testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
+                for k, v in layer1_est_preds.items():
+                    base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(testY, v))
 
                 base_layer_results_repo.save()
 
@@ -116,23 +116,21 @@ def layer2(train, label_cols, oof_path, metric, save_report):
     layer2_inputs = {}
     layer2_chosen_model_data = {}
 
-    model_id = str(int(time.time()))
+    model_id = utils.get_random_string()
     model_name = model_id+'__'+ModelName.LOGREG.name
     model_pool[model_name] = SklearnBLE(LogisticRegression)
     chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
         base_layer_results_repo.get_results(layer='layer1', threshold=0.70)
     layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-    layer2_chosen_model_data[model_id] = '|'.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+    layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
-    time.sleep(1.5)  # make sure int(time.time()) returns different value
-
-    model_id = str(int(time.time()))
-    model_name = model_id+'__'+ModelName.LOGREG.name
-    model_pool[model_name] = SklearnBLE(DecisionTreeClassifier)
-    chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-        base_layer_results_repo.get_results(layer='layer1', threshold=0.713)
-    layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-    layer2_chosen_model_data[model_id] = '\n'.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+    # model_id = utils.get_random_string()
+    # model_name = model_id+'__'+ModelName.LOGREG.name
+    # model_pool[model_name] = SklearnBLE(DecisionTreeClassifier)
+    # chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
+    #     base_layer_results_repo.get_results(layer='layer1', threshold=0.713)
+    # layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
+    # layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
         compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018, metric=metric, metrics_callback=metrics_callback)
@@ -144,6 +142,13 @@ def layer2(train, label_cols, oof_path, metric, save_report):
         model_id = model_data.split('__')[0]
         base_layer_results_repo.add_score(model_data, layer2_cv_score[model_data])
         base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2_chosen_model_data[model_id])
+
+    # for debug purpose, read in testY  # TODO, remove after development
+    import numpy as np
+    testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
+    for k, v in layer2_est_preds.items():
+        base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(testY, v))
+
     base_layer_results_repo.save()
 
     if save_report:
@@ -151,12 +156,6 @@ def layer2(train, label_cols, oof_path, metric, save_report):
         stacknet_report_file = oof_path + 'stacknet_report.csv'
         stacknet_report.to_csv(stacknet_report_file, index=False)
         module_logger.info('StackNet Report saved at {}'.format(stacknet_report_file))
-
-    # for debug purpose, read in testY  # TODO, remove after development
-    import numpy as np
-    testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-    for k, v in layer2_est_preds.items():
-        print('roc of test', k, roc_auc_score(testY, v))
 
 
 def _get_metrics_callback(metric):

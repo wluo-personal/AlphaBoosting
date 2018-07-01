@@ -64,8 +64,8 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             do_preds, X_test, preds_save_path):
     lgb_params, seed = gs_params_gen(gs_model)
     metric = lgb_params['metric']
-    time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
-    run_id = int(time.time())  # also works as the index of the result dataframe
+    # time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
+    run_id = utils.get_random_string()  # also works as the index of the result dataframe
 
     # import pprint
     # pp = pprint.PrettyPrinter(indent=4)
@@ -109,10 +109,9 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         y_test = model.predict(X_test)
 
         # for debug purpose, read in testY  ########################################
-        import numpy as np
         from sklearn.metrics import roc_auc_score
         testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-        module_logger.warning('DEBUG: roc of test: {}'.format(roc_auc_score(testY, y_test)))
+        print('(_lgb_gs) roc of test: {}'.format(roc_auc_score(testY, y_test)))
         # for debug purpose, read in testY  ########################################
 
         np.save(preds_save_path + 'lgb_preds_{}'.format(run_id), y_test)
@@ -131,8 +130,8 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
            gs_params_gen, gs_model, verbose_eval,
            do_preds, X_test, preds_save_path):
     nn_params, seed = gs_params_gen(gs_model)
-    time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
-    run_id = int(time.time())
+    # time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
+    run_id = utils.get_random_string()
 
     nn_params['timestamp'] = utils.get_time()
     gs_start_time = time.time()
@@ -187,10 +186,9 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
         y_test = model.predict(test_dict, batch_size=pred_batch_size, verbose=verbose_eval)
 
         # for debug purpose, read in testY  ########################################
-        import numpy as np
         from sklearn.metrics import roc_auc_score
         testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-        module_logger.warning('DEBUG: roc of test: {}'.format(roc_auc_score(testY, y_test)))
+        print('(_nn_gs) roc of test: {}'.format(roc_auc_score(testY, y_test)))
         # for debug purpose, read in testY  ########################################
 
         np.save(preds_save_path + 'nn_preds_{}'.format(run_id), y_test)
