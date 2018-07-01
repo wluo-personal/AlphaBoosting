@@ -1,7 +1,8 @@
-from automl_libs.base_layer_utils import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
-from automl_libs.stack_layer_estimator import SklearnBLE, LightgbmBLE, NNBLE
-from automl_libs.base_layer_utils import compute_layer1_oof, compute_layer2_oof
+from automl_libs import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
+from automl_libs import SklearnBLE, LightgbmBLE, NNBLE
+from automl_libs import compute_layer1_oof, compute_layer2_oof
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import roc_auc_score
 import pandas as pd
 from os import listdir
@@ -11,7 +12,8 @@ import logging, gc
 module_logger = logging.getLogger(__name__)
 
 
-def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs, oof_nfolds, oof_path, metric, gs_result_path=''):
+def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
+           oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     Params:
         train: DataFrame with label
@@ -33,9 +35,7 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs, oo
     #               [ModelName.LOGREG, ModelName.XGB])
     module_logger.debug(bldr)
 
-    metrics_callback = None
-    if metric == 'roc_auc':
-        metrics_callback = roc_auc_score
+    metrics_callback = _get_metrics_callback(metric)
 
     # may be search gs result path and find all result files?
     for filename in listdir(gs_result_path):
@@ -74,7 +74,7 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs, oo
                         base_layer_estimator = NNBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.NN.name] = base_layer_estimator
 
-                layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, model_data_id_list = \
+                layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, model_data_id_list = \
                     compute_layer1_oof(bldr, model_pool, label_cols, nfolds=oof_nfolds,
                                        sfm_threshold=None, metrics_callback=metrics_callback)
 
@@ -85,17 +85,22 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs, oo
                     module_logger.warning('DEBUG: roc of test {}: {}'.format(k, roc_auc_score(testY, v)))
                 # for debug purpose, read in testY  ########################################
 
-                base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds, model_data_id_list)
+                base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds,
+                                            layer1_cv_score, model_data_id_list)
 
+                # the following add/update scores to model_data in the repo, so it
+                # needs to be done after the [add] function, which stores
+                # model_data into the repo.
                 for model_data in model_data_id_list:
                     result_index = int(model_data.split('__')[0])
-                    val_score = gs_res_dict[result_index]['val_auc']  # TODO: not hard coding
+                    val_score = gs_res_dict[result_index]['val_'+metric]
                     base_layer_results_repo.add_score(model_data, val_score)
+                    base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
 
                 base_layer_results_repo.save()
 
 
-def layer2(train, label_cols, oof_path, metric):
+def layer2(train, label_cols, oof_path, metric, save_report):
     """
     Params:
         train: DataFrame with label
@@ -103,19 +108,61 @@ def layer2(train, label_cols, oof_path, metric):
             e.g. ['label'] or ['label1', 'label2']
 
     """
+    metrics_callback = _get_metrics_callback(metric)
     base_layer_results_repo = BaseLayerResultsRepo(label_cols=label_cols, filepath=oof_path, load_from_file=True)
     module_logger.info('All available layer1 model_data:')
     module_logger.info(base_layer_results_repo.show_scores())
     model_pool = {}
     layer2_inputs = {}
-    model_name = str(int(time.time()))+'__'+ModelName.LOGREG.name
-    model_pool[model_name] = SklearnBLE(LogisticRegression)
-    layer2_inputs[model_name] = base_layer_results_repo.get_results(threshold=0.7)
-    layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018, metric=metric)
+    layer2_chosen_model_data = {}
 
-    # for debug purpose, read in testY
+    model_id = str(int(time.time()))
+    model_name = model_id+'__'+ModelName.LOGREG.name
+    model_pool[model_name] = SklearnBLE(LogisticRegression)
+    chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
+        base_layer_results_repo.get_results(layer='layer1', threshold=0.70)
+    layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
+    layer2_chosen_model_data[model_id] = '|'.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+
+    time.sleep(1.5)  # make sure int(time.time()) returns different value
+
+    model_id = str(int(time.time()))
+    model_name = model_id+'__'+ModelName.LOGREG.name
+    model_pool[model_name] = SklearnBLE(DecisionTreeClassifier)
+    chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
+        base_layer_results_repo.get_results(layer='layer1', threshold=0.713)
+    layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
+    layer2_chosen_model_data[model_id] = '\n'.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+
+    layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
+        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018, metric=metric, metrics_callback=metrics_callback)
+
+    base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
+                                layer2_cv_score, layer2_model_data_list)
+
+    for model_data in layer2_model_data_list:
+        model_id = model_data.split('__')[0]
+        base_layer_results_repo.add_score(model_data, layer2_cv_score[model_data])
+        base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2_chosen_model_data[model_id])
+    base_layer_results_repo.save()
+
+    if save_report:
+        stacknet_report = base_layer_results_repo.get_report()
+        stacknet_report_file = oof_path + 'stacknet_report.csv'
+        stacknet_report.to_csv(stacknet_report_file, index=False)
+        module_logger.info('StackNet Report saved at {}'.format(stacknet_report_file))
+
+    # for debug purpose, read in testY  # TODO, remove after development
     import numpy as np
     testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
     for k, v in layer2_est_preds.items():
         print('roc of test', k, roc_auc_score(testY, v))
+
+
+def _get_metrics_callback(metric):
+    metrics_callback = None
+    if metric == 'auc':
+        metrics_callback = roc_auc_score
+    else:
+        module_logger.warning('metric is NOT auc, metric callback will be None')
+    return metrics_callback

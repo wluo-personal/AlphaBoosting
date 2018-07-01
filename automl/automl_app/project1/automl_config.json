@@ -13,7 +13,7 @@
     "not_features": [],
     "label": "label",
     "gs_search_rounds": 1,
-    "gs_cv": false,
+    "gs_cv": true,
     "gs_nfold": 5,
     "gs_verbose_eval": 20,
     "gs_do_preds": true,
@@ -21,7 +21,7 @@
         
     "oof_nfolds": 5,
     "top_n_gs": 3,
-    "report_metric": "roc_auc",
+    "report_metric": "auc",
     
     "_comments": {
         "validation": "validation_index overrules validation_ratio",

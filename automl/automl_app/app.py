@@ -302,7 +302,8 @@ class AlphaBoosting:
                             top_n_gs=self.config_dict['top_n_gs'],
                             oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
                             metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
-            stacknet.layer2(train, label_cols, oof_path, metric=self.config_dict['report_metric'])
+            stacknet.layer2(train, label_cols, oof_path, metric=self.config_dict['report_metric'],
+                            save_report=True)
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
 

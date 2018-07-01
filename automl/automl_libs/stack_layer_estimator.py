@@ -8,7 +8,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import cross_val_score
 from scipy.sparse import csr_matrix, hstack, vstack
-from keras.layers import Dense, Embedding, Input, LSTM, Bidirectional, GlobalMaxPool1D, Dropout, BatchNormalization
+from keras.layers import Dense, Embedding, Input, LSTM, GRU, Bidirectional, \
+    GlobalMaxPool1D, Dropout, BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.models import Model
 import lightgbm as lgb
@@ -84,6 +85,8 @@ class SklearnBLE(BaseLayerEstimator):
         """
         Available scoring: http://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter
         """
+        if scoring == 'auc':
+            scoring = 'roc_auc'
         if scoring is not None:
             score = cross_val_score(self.model, x, y, cv=nfolds, scoring=scoring)
         else:

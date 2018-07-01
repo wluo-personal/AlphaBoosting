@@ -7,7 +7,7 @@ from enum import Enum
 import pickle
 import copy
 import logging
-from automl_libs.stack_layer_estimator import NNBLE, SklearnBLE
+from automl_libs import SklearnBLE, NNBLE
 module_logger = logging.getLogger(__name__)
 import pdb
 
@@ -29,11 +29,12 @@ class ModelName(Enum):
     NBLSVC = 14
     LSVC_PERLABEL = 15
     NBLSVC_PERLABEL = 16
-    RF = 17 # random forest
-    ET = 18 # extra trees
-    NN = 19
-    ONESVC = 20
-    ONELOGREG = 21
+    DTC = 17 # DecisionTreeClassifier
+    RF = 18 # random forest
+    ET = 19 # extra trees
+    NN = 20
+    ONESVC = 21
+    ONELOGREG = 22
 
 
 class BaseLayerDataRepo():
@@ -224,6 +225,7 @@ class BaseLayerResultsRepo:
         self._base_layer_est_preds = {}
         self._model_data_id_list = []
         self._base_layer_est_scores = {}
+        self._status_report = {}
         self._label_cols = label_cols
         self.filepath = filepath
         self._save_lock = False # will be set to True if remove() is invoked successfully
@@ -232,13 +234,14 @@ class BaseLayerResultsRepo:
             self._layer1_oof_train = load_obj('models_layer1_oof_train', self.filepath)
             self._layer1_oof_test = load_obj('models_layer1_oof_test', self.filepath)
             self._base_layer_est_preds = load_obj('models_base_layer_est_preds', self.filepath)
-            self._model_data_id_list = load_obj('models_model_data_id_list',self.filepath)
-            self._base_layer_est_scores = load_obj('models_base_layer_est_scores',self.filepath)
+            self._model_data_id_list = load_obj('models_model_data_id_list', self.filepath)
+            self._base_layer_est_scores = load_obj('models_base_layer_est_scores', self.filepath)
+            self._status_report = load_obj('status_report', self.filepath)
 
     def get_model_data_id_list(self):
         return self._model_data_id_list
     
-    def add(self, layer1_oof_train, layer1_oof_test, base_layer_est_preds, model_data_id_list):
+    def add(self, layer1_oof_train, layer1_oof_test, base_layer_est_preds, layer1_cv_score, model_data_id_list):
         assert type(layer1_oof_train) == dict
         assert len(list(layer1_oof_train)) == len(self._label_cols)
         assert set(list(layer1_oof_train)) - set(self._label_cols) == set()
@@ -250,6 +253,7 @@ class BaseLayerResultsRepo:
         assert type(base_layer_est_preds) == dict
         assert type(model_data_id_list) == list
         assert set(list(base_layer_est_preds)) - set(model_data_id_list) == set()
+        assert set(list(layer1_cv_score)) - set(model_data_id_list) == set()
         for model_data_id in model_data_id_list:
             if model_data_id in set(self._model_data_id_list):
                 raise ValueError('{} is already in the repo'.format(model_data_id))
@@ -257,21 +261,37 @@ class BaseLayerResultsRepo:
             if model_data_id not in set(self._model_data_id_list):
                 self._model_data_id_list.append(model_data_id)
                 self._base_layer_est_scores[model_data_id] = 0
+                self._status_report[model_data_id] = {}
         for (key, values) in base_layer_est_preds.items():
             self._base_layer_est_preds[key] = values
         for label in self._label_cols:
             self._layer1_oof_train[label] += layer1_oof_train[label]
             self._layer1_oof_test[label] += layer1_oof_test[label]
-    
+        for (model_data_id, cv_score) in layer1_cv_score.items():
+            self.update_report(model_data_id, 'oof_cv_score', cv_score)
+
+    def update_report(self, model_data_id, report_key, report_value):
+        if model_data_id not in set(self._model_data_id_list):
+            raise ValueError('model_data_id is not found in the repo. function [add] needs '
+                             'to be run first so that this model_data is in the repo')
+        self._status_report[model_data_id][report_key] = report_value
+
+    def get_report(self, as_df=True):
+        if as_df:
+            return pd.DataFrame.from_dict(self._status_report, orient='index')\
+                .reset_index().rename(columns={'index': 'model_data'})
+        else:
+            return self._status_report
+
     def add_score(self, model_data_id, score):
-        assert score <= 1 and score >= 0
+        assert 0 <= score <= 1
         if model_data_id not in set(self._model_data_id_list):
             raise ValueError('{} not in the repo. please add it first'.format(model_data_id))
         if model_data_id in set(self._model_data_id_list):
             self.logger.debug('{} already existed in the repo. score: {} update to {}'
                               .format(model_data_id, self._base_layer_est_scores[model_data_id], score))
         self._base_layer_est_scores[model_data_id] = score
-    
+
     def show_scores(self):
         """
         Returns:
@@ -281,32 +301,41 @@ class BaseLayerResultsRepo:
         # for key, value in sorted_list_from_dict:
         #     print('{}\t{}'.format(value, key))
         return sorted_list_from_dict
-    
-    def get_results(self, threshold=None, chosen_ones=None):
+
+    def get_results(self, layer, threshold=None, chosen_ones=None):
         """
         Params:
-            Note: threshold and chosen_ones can NOT both be not-None
-            threshold: if not None, then return only ones that score >= threshold
-            chosen_ones: list of model_data_id
+            layer: 'layer1', 'layer2'
+            threshold: if not None, then return only ones in specified [layer] with score >= threshold
+            chosen_ones: list of model_data_id. ignores parameter: layer
+            Note:
+                1. threshold and chosen_ones can NOT both have value
+                2. if threshold and chosen_ones are both None, return all
+                3. threshold based on:
+                    layer1: gs_val_metric (e.g. gs_val_auc)
+                    layer2: oof_cv_score
         Returns: 
-            layer1_oof_train, layer1_oof_test, base_layer_est_preds
+            chosen_layer_oof_train, chosen_layer_oof_test,
+            chosen_layer_est_preds, chosen_model_data_list
         """
-        if threshold != None and chosen_ones != None:
+        if threshold is not None and chosen_ones is not None:
             raise ValueError('threshold and chosen_ones can NOT both be not-None')
-        if threshold == None and chosen_ones == None:
+        if threshold is None and chosen_ones is None:
             return self._layer1_oof_train, self._layer1_oof_test, self._base_layer_est_preds
         else:
-            layer1_oof_train_temp = copy.deepcopy(self._layer1_oof_train) # copy only keep the keys, not the value reference
-            layer1_oof_test_temp = copy.deepcopy(self._layer1_oof_test)   # deepcopy also keep the value reference
+            layer1_oof_train_temp = copy.deepcopy(self._layer1_oof_train)  # copy only keep the keys, not the value reference
+            layer1_oof_test_temp = copy.deepcopy(self._layer1_oof_test)  # deepcopy also keep the value reference
             base_layer_est_preds_temp = self._base_layer_est_preds.copy()
             base_layer_est_scores_temp = self._base_layer_est_scores.copy()
+            status_report = self._status_report.copy()
             model_data_id_list_temp = self._model_data_id_list.copy()
-            if threshold != None:
-                assert threshold <= 1 and threshold >= 0
+            if threshold is not None:
+                assert 0 <= threshold <= 1
                 for (key, value) in base_layer_est_scores_temp.items():
-                    if value < threshold:
+                    if value < threshold or layer not in key:
+                        # e.g. 'layer1' not in '1530415817__LogisticRegression_layer2'
                         self.remove(key)
-            else: # chosen_ones != None
+            else: # chosen_ones is not None
                 assert type(chosen_ones) == list
                 for model_data_id in model_data_id_list_temp:
                     if model_data_id not in chosen_ones:
@@ -314,20 +343,25 @@ class BaseLayerResultsRepo:
                 
             self._save_lock = False # not actually removed, so set it back to True
 
-            r1, r2, r3 = self._layer1_oof_train, self._layer1_oof_test, self._base_layer_est_preds
+            r1 = self._layer1_oof_train
+            r2 = self._layer1_oof_test
+            r3 = self._base_layer_est_preds
+            r4 = self._model_data_id_list
 
             self._layer1_oof_train = layer1_oof_train_temp
             self._layer1_oof_test = layer1_oof_test_temp
             self._base_layer_est_preds = base_layer_est_preds_temp
             self._base_layer_est_scores = base_layer_est_scores_temp
+            self._status_report = status_report
             self._model_data_id_list = model_data_id_list_temp
-            return r1, r2, r3
+            return r1, r2, r3, r4
     
     def remove(self, model_data_id):
         mdid_index = self._model_data_id_list.index(model_data_id)
         self._model_data_id_list.pop(mdid_index)
         self._base_layer_est_preds.pop(model_data_id)
         self._base_layer_est_scores.pop(model_data_id)
+        self._status_report.pop(model_data_id)
         for label in self._label_cols:
             self._layer1_oof_train[label].pop(mdid_index)
             self._layer1_oof_test[label].pop(mdid_index)
@@ -347,6 +381,7 @@ class BaseLayerResultsRepo:
             save_obj(self._layer1_oof_test, 'models_layer1_oof_test', self.filepath)
             save_obj(self._base_layer_est_preds, 'models_base_layer_est_preds', self.filepath)
             save_obj(self._base_layer_est_scores, 'models_base_layer_est_scores', self.filepath)
+            save_obj(self._status_report, 'status_report', self.filepath)
 
 
 def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=True, seed=1001, metrics_callback=None):
@@ -367,6 +402,7 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
     else:
         kf = KFold(n_splits=nfolds, shuffle=shuffle, random_state=seed)
 
+    cv_score = 0
     for i, (tr_index, te_index) in enumerate(kf.split(x_train, y_train)):
         if isinstance(x_train, pd.DataFrame):  # if type(x_train).__name__ == 'DataFrame':
             x_tr, x_te = x_train.iloc[tr_index], x_train.iloc[te_index]
@@ -396,15 +432,17 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         y_pred_of_the_fold = np.array(y_pred_of_the_fold).reshape(-1,)
         oof_train[te_index] = y_pred_of_the_fold
         if metrics_callback is not None:
-            module_logger.debug('metric of fold {}: {}'.format(i, metrics_callback(y_te, y_pred_of_the_fold)))
-            # TODO:
-            # store scores in a report (layer1 model_data's metric on cv (need to combine all folds metric)
+            score = metrics_callback(y_te, y_pred_of_the_fold)
+            module_logger.debug('metric of fold {}: {}'.format(i, score))
+            cv_score += score
 
         y_pred_of_test = np.array(y_pred_of_test).reshape(-1,)
         oof_test_kf[i, :] = y_pred_of_test
 
+    cv_score = cv_score / nfolds
+
     oof_test[:] = oof_test_kf.mean(axis=0)
-    return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1)#, oof_test_kf.reshape(-1, nfolds)
+    return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1), cv_score#, oof_test_kf.reshape(-1, nfolds)
 
 
 def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_threshold=None, metrics_callback=None):
@@ -419,15 +457,17 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
             that have importance > sfm_threshold
         metrics_callback: function(y_true, y_pred) to calculate per fold metrics
     Returns:
-        layer1_est_preds: This the prediction of the layer 1 model_data, you can submit it to see the LB score
+        layer1_est_preds: This is the prediction of the layer 1 model_data, you can submit it to see the LB score
         layer1_oof_train: This will be used as training features in higher layers (one from each model_data)
         layer1_oof_mean_test: This will be used as testing features in higher layers (one from each model_data)
+        layer1_cv_score: This is a list of cv scores (e.g. auc) of all layer 2 model_data
         model_data_id_list: This is the list of all layer 1 model_data
     """
     layer1_est_preds = {} # directly preditions from the base layer estimators # also layer1_oof_nofold_test
 
     layer1_oof_train = {}
     layer1_oof_mean_test = {}
+    layer1_cv_score = {}
     #layer1_oof_perfold_test = {}
     #layer1_oof_nofold_test = {}
 
@@ -441,7 +481,7 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
             model_id = model_name.split('__')[1]
             for data in bldr.get_data_by_compatible_model(model_id):
 
-                model_data_id = '{}_{}'.format(model_name, data['data_id'])
+                model_data_id = '{}_{}_{}'.format(model_name, data['data_id'], 'layer1')
                 current_run = 'label: {:8s} model_data_id: {}'.format(label, model_data_id)
                 module_logger.debug('Computing layer1: '+current_run)
 
@@ -469,8 +509,9 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
                     model.set_params_for_label(label)
 
                 if nfolds != 0:
-                    oof_train, oof_mean_test = get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
-                                                       stratified=True, seed=seed, metrics_callback=metrics_callback)
+                    oof_train, oof_mean_test, cv_score = \
+                        get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
+                                stratified=True, seed=seed, metrics_callback=metrics_callback)
                 else:
                     raise ValueError('nfolds of oof can NOT be 0!')
 
@@ -496,9 +537,9 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
                     layer1_est_preds[model_data_id] = np.empty((x_test.shape[0],len(label_cols)))
                     model_data_id_list.append(model_data_id)
                 layer1_est_preds[model_data_id][:,i] = est_preds
-    
-    
-    return layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, model_data_id_list
+                layer1_cv_score[model_data_id] = cv_score  # TODO: unlike others, here assuming one label
+
+    return layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, model_data_id_list
 
 
 def combine_layer_oof_per_label(layer1_oof_dict, label):
@@ -515,7 +556,7 @@ def combine_layer_oof_per_label(layer1_oof_dict, label):
     return x
 
 
-def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed, metric):
+def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed, metric, metrics_callback=None):
     """
     Params:
         model_pool: dict. key: an option from ModelName. value: A model
@@ -526,15 +567,17 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
         nfolds: int
         seed: int. for reproduce purpose
     Returns:
-        layer2_est_preds: This the prediction of the layer 1 model_data, you can submit it to see the LB score
+        layer2_est_preds: This is the prediction of the layer 2 model_data, you can submit it to see the LB score
         layer2_oof_train: This will be used as training features in higher layers (one from each model_data)
         layer2_oof_mean_test: This will be used as testing features in higher layers (one from each model_data)
-        layer2_model_data_list: This is the list of all layer 1 model_data
+        layer2_cv_score: This is a list of cv scores (e.g. auc) of all layer 2 model_data
+        layer2_model_data_list: This is the list of all layer 2 model_data
     """
     layer2_est_preds = {} # directly preditions from the base layer estimators
 
     layer2_oof_train = {}
     layer2_oof_test = {}
+    layer2_cv_score = {}
 
     layer2_model_data_list = []
 
@@ -550,7 +593,8 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             x_train = combine_layer_oof_per_label(layer1_oof_train_loaded, label)
             x_test = combine_layer_oof_per_label(layer1_oof_test_loaded, label)
 
-            oof_train, oof_test = get_oof(model,  x_train, train[label], x_test, nfolds, seed)
+            oof_train, oof_test, cv_score = get_oof(model,  x_train, train[label], x_test,
+                                                    nfolds, seed, metrics_callback=metrics_callback)
 
             if label not in layer2_oof_train:
                 layer2_oof_train[label] = []
@@ -559,21 +603,13 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             layer2_oof_test[label].append(oof_test)
 
             model_id = '{}_{}'.format(model_name, 'layer2')
-            if type(model).__name__ == SklearnBLE.__name__:  # if isinstance(model, SklearnBLE):
-                if metric == 'auc':
-                    metric = 'roc_auc'
-                scores = model.cv(x_train, train[label], nfolds=5, scoring=metric)
-                scores = np.mean(scores)
-                module_logger.info('Layer2 {} | {}: {}'.format(model_name, metric, scores))
-                # TODO:
-                # store scores in a report (layer2 model_data's metric on cv)
-            else:
-                model.train(x_train, train[label])
+            model.train(x_train, train[label])
             est_preds = model.predict(x_test)
 
             if model_id not in layer2_est_preds:
-                layer2_est_preds[model_id] = np.empty((x_test.shape[0],len(label_cols)))
+                layer2_est_preds[model_id] = np.empty((x_test.shape[0], len(label_cols)))
                 layer2_model_data_list.append(model_id)
-            layer2_est_preds[model_id][:,i] = est_preds
-    
-    return layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_model_data_list
+            layer2_est_preds[model_id][:, i] = est_preds
+            layer2_cv_score[model_id] = cv_score  # TODO: unlike others, here assuming one label
+
+    return layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list

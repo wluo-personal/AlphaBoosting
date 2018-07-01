@@ -1,35 +1,40 @@
 {
     "project_root": "./",
-    "run_record_filename": "run_record.json",
-    "train_data_url": "data/train.pkl",
-    "test_data_url": "data/test.pkl",
+    "last_run_record_filename": "last_run_record.json",
+    "train_data_url": "data/train_1M.pkl",
+    "test_data_url": "data/testX_100k.pkl",
     "down_sampling_amt": 0,
-    "down_sampling_ratio": null,
+    "down_sampling_ratio": null, 
     "validation_index": null, 
-    "validation_ratio": 0,
+    "validation_ratio": 0.2,
         
-    "categorical_features": ["user", "movie", "age", "gender", "occupation", "zip", "released"],
+    "gs_model": "lgb",
+    "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_record_filename": "project2_grid_search.csv",
-    "gs_search_rounds": 2,
+    "gs_search_rounds": 3,
     "gs_cv": true,
-    "gs_nfold": 4,
-    "gs_verbose_eval": 5,
-    "gs_do_preds": false,
-    "gs_suppress_warning": false,
+    "gs_nfold": 5,
+    "gs_verbose_eval": 20,
+    "gs_do_preds": true,
+    "gs_suppress_warning": true,
         
+    "oof_nfolds": 5,
+    "top_n_gs": 3,
+    "report_metric": "auc",
+    
     "_comments": {
-        "validation_ratio": "1. overruled by validation_index, 2. set it to 0 and index to null if gs_cv is true",
-        "validation_index": "json (or maybe better with pickle?) file that specify index of data for validation",
+        "validation": "validation_index overrules validation_ratio",
+        "validation_ratio" : "range(exclusive): (0,1)",
         "down_sampling_amt": [
-            "integer. 0: no downsampling (or in regression problem). >0, the amount of downsamplings",
+            "integer. 0: no downsampling. >0, the amount of downsamplings",
             "Note 1: combine the same positive samples with different negative samples will result in a different downsampling (assume more neg samples then pos samples",
             "Note 2: when set to 0, 'down_sampling_ratio' has no effect"
         ],
         "down_sampling_ratio": [
             "null or float in (0,1]",
-            "Note1: e.g. if 0.7, means chosen all pos samples plus 70% of negative samples. if null, then choose the all pos samples plus same amount of neg samples. (assume more neg samples then pos samples.)"
-        ]
+            "Note: e.g. if 0.7, means chosen all pos samples plus 70% of negative samples. if null, then choose the all pos samples plus same amount of neg samples. (assume more neg samples then pos samples.)"
+        ],
+        "gs_model": "lgb, nn, (or all). grid search models"
     }
 }
