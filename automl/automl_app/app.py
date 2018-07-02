@@ -19,6 +19,7 @@ class AlphaBoosting:
 
     def __init__(self, config_file, features_to_gen, gs_params_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
+        self.logger.info('='*10+'NEW RUN'+'='*10)
 
         if config_file is None:
             raise Exception('config file can not be None')
@@ -255,7 +256,6 @@ class AlphaBoosting:
             self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_GEN.name, self.OUTDIR + 'todo_list.json')
 
 
-
     def _grid_search(self, to_do_dict):
         stage = self.Stage.GRID_SEARCH.name
         if not to_do_dict[stage]:
@@ -266,7 +266,7 @@ class AlphaBoosting:
             y_val = val[label_col]
             X_test = test[feature_cols]
 
-            gs_model = self.config_dict['gs_model']
+            gs_models = self.config_dict['gs_models']
             gs_record_dir = self.OUTDIR
             gs_search_rounds = self.config_dict['gs_search_rounds']
             gs_cv = self.config_dict['gs_cv']
@@ -278,7 +278,7 @@ class AlphaBoosting:
             grid_search.gs(X_train, y_train, X_val, y_val,
                            categorical_features, search_rounds=gs_search_rounds,
                            gs_record_dir=gs_record_dir,
-                           gs_params_gen=self.gs_params_gen, gs_model=gs_model,
+                           gs_params_gen=self.gs_params_gen, gs_models=gs_models,
                            cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
                            do_preds=gs_do_preds, X_test=X_test,
                            preds_save_path=self.OUTDIR+'gs_saved_preds/',
@@ -323,6 +323,10 @@ class AlphaBoosting:
         train = train.head(100000)
         # TODO:
         # remove .head(X)
+        self.logger.info('Data retrieved. Shape: train {} | val {} | test {} | '
+                         '{} cat features | {} total features | y name: {}'
+                         .format(train.shape, val.shape, test.shape,
+                                 len(categorical_features), len(feature_cols), label_col))
         return train, val, test, categorical_features, feature_cols, label_col
 
         

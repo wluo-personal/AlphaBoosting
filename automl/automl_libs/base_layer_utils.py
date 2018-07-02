@@ -288,7 +288,7 @@ class BaseLayerResultsRepo:
         if model_data_id not in set(self._model_data_id_list):
             raise ValueError('{} not in the repo. please add it first'.format(model_data_id))
         if model_data_id in set(self._model_data_id_list):
-            self.logger.debug('{} already existed in the repo. score: {} update to {}'
+            self.logger.info('{} found in repo. Update score from {} to {:.5f}'
                               .format(model_data_id, self._base_layer_est_scores[model_data_id], score))
         self._base_layer_est_scores[model_data_id] = score
 
@@ -419,7 +419,7 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         y_train = np.array(y_train)
         y_tr, y_te = y_train[tr_index], y_train[te_index]
 
-        module_logger.debug('processing fold {} of {}...'.format(i, nfolds))
+        module_logger.info('processing fold {} of {}...'.format(i+1, nfolds))
         if type(clf).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
             clf.train(x_tr, y_tr, x_te, y_te, x_test)
             y_pred_of_the_fold = clf.predict('x_te')
@@ -433,7 +433,7 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         oof_train[te_index] = y_pred_of_the_fold
         if metrics_callback is not None:
             score = metrics_callback(y_te, y_pred_of_the_fold)
-            module_logger.debug('metric of fold {}: {}'.format(i, score))
+            module_logger.info('metric of fold {}: {}'.format(i+1, score))
             cv_score += score
 
         y_pred_of_test = np.array(y_pred_of_test).reshape(-1,)
@@ -483,7 +483,7 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
 
                 model_data_id = '{}_{}_{}'.format(model_name, data['data_id'], 'layer1')
                 current_run = 'label: {:8s} model_data_id: {}'.format(label, model_data_id)
-                module_logger.debug('Computing layer1: '+current_run)
+                module_logger.info('StackNet layer1: '+current_run)
 
                 x_train = data['x_train']  # x_train: dataframe
                 y_train = data['y_train'][label]  # y_train: list

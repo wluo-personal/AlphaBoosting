@@ -6,13 +6,13 @@
     "down_sampling_amt": 0,
     "down_sampling_ratio": null, 
     "validation_index": null, 
-    "validation_ratio": 0.2,
+    "validation_ratio": 0.05,
         
-    "gs_model": "nn",
+    "gs_models": "lgb|nn",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_search_rounds": 2,
+    "gs_search_rounds": 1,
     "gs_cv": true,
     "gs_nfold": 5,
     "gs_verbose_eval": 20,
@@ -35,6 +35,6 @@
             "null or float in (0,1]",
             "Note: e.g. if 0.7, means chosen all pos samples plus 70% of negative samples. if null, then choose the all pos samples plus same amount of neg samples. (assume more neg samples then pos samples.)"
         ],
-        "gs_model": "lgb, nn, (or all). grid search models"
+        "gs_model": "lgb, nn, lgb|nn. grid search models"
     }
 }

@@ -6,5 +6,5 @@
     "test_data_url": "data/testX_100k.pkl",
     "train_data_url": "data/train_1M.pkl",
     "validation_index": "./temp_data/val_index.pkl",
-    "validation_ratio": 0.2
+    "validation_ratio": 0.05
 }

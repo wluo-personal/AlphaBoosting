@@ -7,12 +7,13 @@ import numpy as np
 import lightgbm as lgb
 from keras.callbacks import LearningRateScheduler, EarlyStopping, ModelCheckpoint
 from automl_libs import utils, nn_libs
+import pdb
 import logging
 module_logger = logging.getLogger(__name__)
 
 
 def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
-       gs_record_dir, gs_params_gen, gs_model, cv, nfold,
+       gs_record_dir, gs_params_gen, gs_models, cv, nfold,
        verbose_eval, do_preds, X_test, preds_save_path, suppress_warning, **kwargs):
 
     if suppress_warning:
@@ -23,40 +24,42 @@ def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
         if not os.path.exists(preds_save_path):
             os.makedirs(preds_save_path)
 
-    for i in range(search_rounds):
-        try:
-            if gs_model == 'lgb':
-                params, run_id = _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
-                                 gs_params_gen, gs_model, cv, nfold, verbose_eval,
-                                 do_preds, X_test, preds_save_path)
-            elif gs_model == 'nn':
-                params, run_id = _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
-                                gs_params_gen, gs_model, verbose_eval,
-                                do_preds, X_test, preds_save_path)
+    for gs_model in gs_models.split('|'):
+        for i in range(search_rounds):
+            module_logger.info('Grid search {}. round {} of {}'.format(gs_model, i+1, search_rounds))
+            try:
+                if gs_model == 'lgb':
+                    params, run_id = _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
+                                     gs_params_gen, gs_model, cv, nfold, verbose_eval,
+                                     do_preds, X_test, preds_save_path)
+                elif gs_model == 'nn':
+                    params, run_id = _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
+                                    gs_params_gen, gs_model, verbose_eval,
+                                    do_preds, X_test, preds_save_path)
 
-            # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
-            for k, v in params.items():
-                if isinstance(v, list):
-                    params[k] = '"'+str(v)+'"'
-                    #module_logger.debug(params[k])
+                # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
+                for k, v in params.items():
+                    if isinstance(v, list):
+                        params[k] = '"'+str(v)+'"'
+                        #module_logger.debug(params[k])
 
-            res = pd.DataFrame(params, index=[run_id])
-            filename_for_gs_results = gs_record_dir + '{}_grid_search.csv'.format(gs_model)
-            if not os.path.exists(filename_for_gs_results):
-                res.to_csv(filename_for_gs_results)
-                module_logger.debug(filename_for_gs_results + ' created')
-            else:
-                old_res = pd.read_csv(filename_for_gs_results, index_col='Unnamed: 0')
-                res = pd.concat([old_res, res])
-                res.to_csv(filename_for_gs_results)
-                module_logger.debug(filename_for_gs_results + ' updated')
+                res = pd.DataFrame(params, index=[run_id])
+                filename_for_gs_results = gs_record_dir + '{}_grid_search.csv'.format(gs_model)
+                if not os.path.exists(filename_for_gs_results):
+                    res.to_csv(filename_for_gs_results)
+                    module_logger.debug(filename_for_gs_results + ' created')
+                else:
+                    old_res = pd.read_csv(filename_for_gs_results, index_col='Unnamed: 0')
+                    res = pd.concat([old_res, res])
+                    res.to_csv(filename_for_gs_results)
+                    module_logger.info(filename_for_gs_results + ' updated')
 
-        except Exception as e:
-            if 'ResourceExhaustedError' in str(type(e)): # can't catch this error directly... 
-                module_logger.warning('Oops! ResourceExhaustedError. Continue next round')
-                continue
-            else:
-                raise  # throw the exception
+            except Exception as e:
+                if 'ResourceExhaustedError' in str(type(e)): # can't catch this error directly...
+                    module_logger.warning('Oops! ResourceExhaustedError. Continue next round')
+                    continue
+                else:
+                    raise  # throw the exception
 
 
 def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
@@ -81,7 +84,9 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         del lgb_train; gc.collect()
         best_round = len(eval_hist[metric + '-mean'])
         lgb_params['best_round'] = best_round
-        lgb_params['val_' + metric] = eval_hist[metric + '-mean'][-1]
+        cv_val_metric = eval_hist[metric + '-mean'][-1]
+        lgb_params['val_' + metric] = cv_val_metric
+        module_logger.info('val_{}: {:.5f} (cv, no train_{})'.format(metric, cv_val_metric, metric))
         lgb_params['cv'] = True
     else:
         lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
@@ -89,8 +94,11 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         model = lgb.train(lgb_params, lgb_train, valid_sets=[lgb_train, lgb_val], verbose_eval=verbose_eval)
         del lgb_train, lgb_val; gc.collect()
         lgb_params['best_round'] = model.best_iteration
-        lgb_params['val_' + metric] = model.best_score['valid_1'][metric]
-        lgb_params['train_' + metric] = model.best_score['training'][metric]
+        val_metric = model.best_score['valid_1'][metric]
+        train_metric = model.best_score['training'][metric]
+        lgb_params['val_' + metric] = val_metric
+        lgb_params['train_' + metric] = train_metric
+        module_logger.info('val_{}: {:.5f} | train_{}: {:.5f} (not cv)'.format(metric, val_metric, metric, train_metric))
 
     # time spent in this round of search, in format hh:mm:ss
     gs_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - gs_start_time)))
@@ -98,13 +106,16 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
     if do_preds:
         predict_start_time = time.time()
-        module_logger.debug('[do_preds] is True, generating predictions ...')
-        module_logger.debug('Retrain model using best_round and all data...')
+        module_logger.info('[do_preds] is True, generating predictions ...')
+        module_logger.info('Retrain model using best_round and all data...')
         best_round = lgb_params['best_round']
         lgb_all_data = lgb.Dataset(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]),
                                    categorical_feature=categorical_feature)
         model = lgb.train(lgb_params, lgb_all_data, valid_sets=lgb_all_data,
                           num_boost_round=best_round, verbose_eval=int(0.2 * best_round))
+        module_logger.info('Training done. Iteration: {} | train_{}: {:.5f} | {} features'
+                           .format(model.current_iteration(), metric,
+                                   model.best_score['training'][metric], model.num_feature()))
         del lgb_all_data; gc.collect()
         y_test = model.predict(X_test)
 
@@ -163,17 +174,21 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
     hist = model.history
     bst_epoch = np.argmax(hist.history['roc_auc_val'])
+    if nn_params['monitor'] == 'val_auc':
+        val_auc = hist.history['roc_auc_val'][bst_epoch]
+        nn_params['val_auc'] = val_auc
+        module_logger.info('val_auc: {:.5f}'.format(val_auc))
     trn_loss = hist.history['loss'][bst_epoch]
-    trn_acc = hist.history['acc'][bst_epoch]
+    trn_acc = hist.history['acc'][bst_epoch]  # TODO: acc might not be there if regression problem
     val_loss = hist.history['val_loss'][bst_epoch]
     val_acc = hist.history['val_acc'][bst_epoch]
-    val_auc = hist.history['roc_auc_val'][bst_epoch]
     nn_params['best_epoch'] = bst_epoch + 1
     nn_params['trn_loss'] = trn_loss
     nn_params['trn_acc'] = trn_acc
     nn_params['val_loss'] = val_loss
     nn_params['val_acc'] = val_acc
-    nn_params['val_auc'] = val_auc
+
+    module_logger.info('val_loss: {:.5f} | train_loss: {:.5f} (not cv)'.format(val_loss, trn_loss))
 
     # time spent in this round of search, in format hh:mm:ss
     gs_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - gs_start_time)))
@@ -181,7 +196,7 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
     if do_preds:
         predict_start_time = time.time()
-        module_logger.debug('[do_preds] is True, generating predictions ...')
+        module_logger.info('[do_preds] is True, generating predictions ...')
         model.load_weights(saved_model_file_name)
         y_test = model.predict(test_dict, batch_size=pred_batch_size, verbose=verbose_eval)
 

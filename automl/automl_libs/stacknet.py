@@ -57,13 +57,13 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
                 for model_data in base_layer_results_repo.get_model_data_id_list():
                     result_index = model_data.split('__')[0]
                     if chosen_res_dict.pop(result_index, None) is not None:
-                        module_logger.debug('{} already processed in StackNet, so removed it from chosen_gs_results'.format(result_index))
+                        module_logger.info('{} already processed in StackNet, so removed it from chosen_gs_results'.format(result_index))
 
             model_pool = {}
             if len(chosen_res_dict) > 0:
                 for k, v in chosen_res_dict.items():
                     params = v
-                    module_logger.debug('using {} params: {} to do oof'.format(model_type, k))
+                    module_logger.info('using {} params: {} to do oof'.format(model_type, k))
                     module_logger.debug(params)
                     params['categorical_feature'] = categorical_cols
                     if model_type == 'lgb':

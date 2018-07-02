@@ -23,7 +23,7 @@ def config(file_name, file_loglevel=logging.DEBUG, console_loglevel=logging.DEBU
         converted = utc_dt.astimezone(my_tz)
         return converted.timetuple()
     logging.Formatter.converter = customTime
-    logger_formatter = logging.Formatter('%(asctime)s | %(levelname)-5s | %(name)-30s| %(funcName)-10s | #%(lineno)-3d | %(message)s', datefmt="%Y-%m-%d %H:%M:%S")# EST")
+    logger_formatter = logging.Formatter('%(asctime)s | %(levelname)-7s | %(name)-34s| %(funcName)-10s | #%(lineno)-3d | %(message)s', datefmt="%Y-%m-%d %H:%M:%S")# EST")
     filelog_handler.setFormatter(logger_formatter)
     console_handler.setFormatter(logger_formatter)
     # Add the Handler to the Logger
