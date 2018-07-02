@@ -359,7 +359,8 @@ class AlphaBoosting:
         generated_feature_name = '__'.join([func.__name__, '_'.join(feature_cols)])
         if feature_to_gen.get('params') != {}: generated_feature_name += '__' + '_'.join(map(str, params.values()))
         params['train_len'] = self.train_len
-        if not os.path.exists(self.FEATUREDIR + generated_feature_name + '.pkl'):
+        if not os.path.exists(self.FEATUREDIR + 'train__' + generated_feature_name + '.pkl'):
+            print('{}'.format(self.FEATUREDIR + generated_feature_name + '.pkl'))
             # TODO: test if passing df=df[feature_cols+[self.label]] can save memory
             _df = func(df=self.df, cols=feature_to_gen.get('feature_cols'), dummy_col=self.label,
                        generated_feature_name=generated_feature_name, params=params)

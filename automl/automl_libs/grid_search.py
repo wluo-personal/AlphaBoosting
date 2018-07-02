@@ -67,7 +67,6 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             do_preds, X_test, preds_save_path):
     lgb_params, seed = gs_params_gen(gs_model)
     metric = lgb_params['metric']
-    # time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
     run_id = utils.get_random_string()  # also works as the index of the result dataframe
 
     # import pprint
