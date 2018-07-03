@@ -19,6 +19,8 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         X_train, X_val, X_test: pandas dataframe
         categorical_features: list of columns names
     """
+    if X_val is None:
+        X_val = X_train.tail(1)
     train_dict = {}
     valid_dict = {}
     test_dict = {}
