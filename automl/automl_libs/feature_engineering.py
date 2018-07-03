@@ -5,7 +5,6 @@ import pandas as pd
 import logging, gc
 module_logger = logging.getLogger(__name__)
 
-
 def count(df, cols, dummy_col, generated_feature_name, params=None):
     """Returns dataframe of one feature that consist of 
     count number of each values in specified column in input dataframe.
