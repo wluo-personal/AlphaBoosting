@@ -42,7 +42,8 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
     for filename in listdir(gs_result_path):
         if '_grid_search' in filename:
             model_type = filename.split('_')[0]  # LGB, NN, etc...
-            gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0').sort_values(by=['val_auc'], ascending=False)
+            gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
+                .sort_values(by=['val_auc'], ascending=False)
             gs_res_dict = gs_res.T.to_dict()
             chosen_res_dict = gs_res.head(top_n_gs).T.to_dict()
 
