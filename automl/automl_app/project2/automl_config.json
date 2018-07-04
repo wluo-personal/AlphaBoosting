@@ -8,7 +8,7 @@
     "validation_index": null, 
     "validation_ratio": 0.05,
         
-    "gs_models": "lgb|nn",
+    "gs_models": "svc",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",

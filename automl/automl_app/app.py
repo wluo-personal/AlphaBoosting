@@ -287,6 +287,8 @@ class AlphaBoosting:
         self._renew_status(to_do_dict, stage, self.OUTDIR + 'todo_list.json')
 
     def _stacknet(self, to_do_dict):
+        import pdb
+        pdb.set_trace()
         if not to_do_dict[self.Stage.STACKNET.name]:
             # seems need absolute path to save
             oof_path = self.OUTDIR + 'oof/'
@@ -320,7 +322,8 @@ class AlphaBoosting:
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
-        train = train.head(100000)
+        train = train.head(1000)
+        val = val.head(1000)
         # TODO:
         # remove .head(X)
         self.logger.info('Data retrieved. Shape: train {} | val {} | test {} | '

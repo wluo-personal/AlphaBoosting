@@ -6,6 +6,10 @@ import pandas as pd
 import numpy as np
 import lightgbm as lgb
 from keras.callbacks import LearningRateScheduler, EarlyStopping, ModelCheckpoint
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import roc_auc_score
 from automl_libs import utils, nn_libs
 import pdb
 import logging
@@ -28,7 +32,11 @@ def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
         for i in range(search_rounds):
             module_logger.info('Grid search {}. round {} of {}'.format(gs_model, i+1, search_rounds))
             try:
-                if gs_model == 'lgb':
+                if gs_model == 'logreg' or gs_model == 'svc':
+                    params, run_id = _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
+                                     gs_params_gen, gs_model, cv, nfold, verbose_eval,
+                                     do_preds, X_test, preds_save_path)
+                elif gs_model == 'lgb':
                     params, run_id = _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                      gs_params_gen, gs_model, cv, nfold, verbose_eval,
                                      do_preds, X_test, preds_save_path)
@@ -61,6 +69,65 @@ def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
                 else:
                     raise  # throw the exception
 
+def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
+            gs_params_gen, gs_model, cv, nfold, verbose_eval,
+            do_preds, X_test, preds_save_path):
+    params, seed = gs_params_gen(gs_model)
+    metric = params['metric']
+    md = None
+    if gs_model == 'svc': md = SVC(C=params['C'], n_jobs=8)
+    elif gs_model == 'logreg': md = LogisticRegression(penalty=params['penalty'], dual=params['dual'], C=params['C'], n_jobs=8)
+    run_id = utils.get_random_string()  # also works as the index of the result dataframe
+
+    # import pprint
+    # pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(lgb_params)
+    params['timestamp'] = utils.get_time()
+    gs_start_time = time.time()
+    if cv:
+        # use ALL data to do cv
+        total_X_train = pd.concat([X_train, X_val])
+        total_y_train = pd.concat([y_train, y_val])
+        scores = cross_val_score(md, total_X_train, total_y_train, cv=nfold, scoring=metric)
+        cv_val_metric = np.mean(scores)
+        params['val_' + metric] = cv_val_metric
+        module_logger.info('val_{}: {:.5f} (cv, no train_{})'.format(metric, cv_val_metric, metric))
+        params['cv'] = True
+    else:
+        model = md.fit(X_train, y_train)
+        val_pred = md.predict_proba(X_val)
+        train_pred = md.predict_proba(X_train)
+        train_metric = roc_auc_score(y_train, train_pred)
+        val_metric = roc_auc_score(y_val, val_pred)
+        params['val_' + metric] = val_metric
+        params['train_' + metric] = train_metric
+        module_logger.info('val_{}: {:.5f} | train_{}: {:.5f} (not cv)'.format(metric, val_metric, metric, train_metric))
+
+    # time spent in this round of search, in format hh:mm:ss
+    gs_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - gs_start_time)))
+    params['gs_timespent'] = gs_elapsed_time_as_hhmmss
+
+    if do_preds:
+        predict_start_time = time.time()
+        module_logger.info('[do_preds] is True, generating predictions ...')
+        module_logger.info('Retrain model using best_round and all data...')
+        model = md.fit(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]))
+        train_pred = model.predict_proba(X_train)[:, 1]
+        module_logger.info('Training done. Train_{}: {:.5f} | {} features'
+                           .format(metric, roc_auc_score(y_train, train_pred), X_train.shape[1]))
+        y_test = model.predict_proba(X_test)[:, 1]
+
+        # for debug purpose, read in testY  ########################################
+        testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
+        print('(_lgb_gs) roc of test: {}'.format(roc_auc_score(testY, y_test)))
+        # for debug purpose, read in testY  ########################################
+
+        np.save(preds_save_path + gs_model + '_preds_{}'.format(run_id), y_test)
+        predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
+        params['pred_timespent'] = predict_elapsed_time_as_hhmmss
+        module_logger.info('LGB predictions({}) saved in {}.'.format(run_id, preds_save_path))
+
+    return params, run_id
 
 def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, verbose_eval,
@@ -119,7 +186,6 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         y_test = model.predict(X_test)
 
         # for debug purpose, read in testY  ########################################
-        from sklearn.metrics import roc_auc_score
         testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
         print('(_lgb_gs) roc of test: {}'.format(roc_auc_score(testY, y_test)))
         # for debug purpose, read in testY  ########################################
@@ -200,7 +266,6 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
         y_test = model.predict(test_dict, batch_size=pred_batch_size, verbose=verbose_eval)
 
         # for debug purpose, read in testY  ########################################
-        from sklearn.metrics import roc_auc_score
         testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
         print('(_nn_gs) roc of test: {}'.format(roc_auc_score(testY, y_test)))
         # for debug purpose, read in testY  ########################################
