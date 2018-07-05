@@ -42,7 +42,8 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
     for filename in listdir(gs_result_path):
         if '_grid_search' in filename:
             model_type = filename.split('_')[0]  # LGB, NN, etc...
-            gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0').sort_values(by=['val_auc'], ascending=False)
+            gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
+                .sort_values(by=['val_auc'], ascending=False)
             gs_res_dict = gs_res.T.to_dict()
             chosen_res_dict = gs_res.head(top_n_gs).T.to_dict()
 
@@ -120,7 +121,35 @@ def layer2(train, label_cols, oof_path, metric, save_report):
     model_name = model_id+'__'+ModelName.LOGREG.name
     model_pool[model_name] = SklearnBLE(LogisticRegression)
     chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-        base_layer_results_repo.get_results(layer='layer1', threshold=0.70)
+        base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=0.70)
+    layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
+    layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+
+    model_id = utils.get_random_string()
+    nn_model_param = {
+        'nn_seed': int(time.time() * 1000000) % 45234634,
+        'ep_for_lr': 1,
+        'lr_init': 0.01,
+        'lr_fin': 0.01,  # if == lr_init, then no lr decay
+        'batch_size': 128,
+        "pred_batch_size": 50000,
+        'best_epoch': 1,
+        'patience': 1,
+        'categorical_feature': [],
+        'cat_emb_outdim': 50,  # could be a constant or a dict (col name:embed out dim). e.g.:
+        # embed_outdim = [3, 3, 8, 8, 3]
+        # embed_outdim_dict = dict(zip(X_train.columns.values, embed_outdim))
+        'dense_units': 50,
+        'num_dense_n_layers': 1,
+        'drop_rate': 0.2,
+        'combined_dense_n_layers': 1,
+        'monitor': 'val_auc',  # or val_loss (MUST HAVE)
+        'mode': 'max'  # MUST HAVE
+    }
+    model_name = model_id+'__'+ModelName.NN.name
+    model_pool[model_name] = NNBLE(params=nn_model_param)
+    chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
+        base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=0.70)
     layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
     layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 

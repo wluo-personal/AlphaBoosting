@@ -45,6 +45,7 @@ class BaseLayerDataRepo():
                        word_ngram, word_max, word_min_df=1, word_max_df=1.0,
                        char_ngram=(0,0), char_max=100000, char_min_df=1, char_max_df=1.0):
         """
+        OUTDATED!
         Params:
             train_sentence: pd.Series. Usually the sentence column of a dataframe.
                 e.g. train['comment_text]
@@ -137,6 +138,7 @@ class BaseLayerDataRepo():
 def tfidf_data_process(train_sentence, test_sentence, word_ngram, word_max, word_min_df=1, word_max_df=1.0,
                        char_ngram=(0,0), char_max=100000, char_min_df=1, char_max_df=1.0):
     """
+    OUTDATED!
     Params:
         train_sentence: pd.Series. Usually the sentence column of a dataframe.
             e.g. train['comment_text]
@@ -302,10 +304,10 @@ class BaseLayerResultsRepo:
         #     print('{}\t{}'.format(value, key))
         return sorted_list_from_dict
 
-    def get_results(self, layer, threshold=None, chosen_ones=None):
+    def get_results(self, chosen_from_layer, threshold=None, chosen_ones=None):
         """
         Params:
-            layer: 'layer1', 'layer2'
+            chosen_from_layer: 'layer1', 'layer2'
             threshold: if not None, then return only ones in specified [layer] with score >= threshold
             chosen_ones: list of model_data_id. ignores parameter: layer
             Note:
@@ -332,7 +334,7 @@ class BaseLayerResultsRepo:
             if threshold is not None:
                 assert 0 <= threshold <= 1
                 for (key, value) in base_layer_est_scores_temp.items():
-                    if value < threshold or layer not in key:
+                    if value < threshold or chosen_from_layer not in key:
                         # e.g. 'layer1' not in '1530415817__LogisticRegression_layer2'
                         self.remove(key)
             else: # chosen_ones is not None
@@ -603,8 +605,13 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             layer2_oof_test[label].append(oof_test)
 
             model_id = '{}_{}'.format(model_name, 'layer2')
-            model.train(x_train, train[label])
-            est_preds = model.predict(x_test)
+            if type(model).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
+                model.train(x_train, train[label], None, None, x_test)
+                est_preds = model.predict('x_test')
+            else:
+                model.train(x_train, train[label])
+                est_preds = model.predict(x_test)
+            est_preds = np.array(est_preds).reshape(-1, )
 
             if model_id not in layer2_est_preds:
                 layer2_est_preds[model_id] = np.empty((x_test.shape[0], len(label_cols)))

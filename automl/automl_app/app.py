@@ -286,8 +286,6 @@ class AlphaBoosting:
         self._renew_status(to_do_dict, stage, self.OUTDIR + 'todo_list.json')
 
     def _stacknet(self, to_do_dict):
-        import pdb
-        pdb.set_trace()
         if not to_do_dict[self.Stage.STACKNET.name]:
             # seems need absolute path to save
             oof_path = self.OUTDIR + 'oof/'
@@ -321,8 +319,8 @@ class AlphaBoosting:
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
-        train = train.head(1000)
-        val = val.head(1000)
+        train = train.head(10000)
+        val = val.head(10000)
         # TODO:
         # remove .head(X)
         self.logger.info('Data retrieved. Shape: train {} | val {} | test {} | '
@@ -362,7 +360,6 @@ class AlphaBoosting:
         if feature_to_gen.get('params') != {}: generated_feature_name += '__' + '_'.join(map(str, params.values()))
         params['train_len'] = self.train_len
         if not os.path.exists(self.FEATUREDIR + 'train__' + generated_feature_name + '.pkl'):
-            print('{}'.format(self.FEATUREDIR + generated_feature_name + '.pkl'))
             # TODO: test if passing df=df[feature_cols+[self.label]] can save memory
             _df = func(df=self.df, cols=feature_to_gen.get('feature_cols'), dummy_col=self.label,
                        generated_feature_name=generated_feature_name, params=params)

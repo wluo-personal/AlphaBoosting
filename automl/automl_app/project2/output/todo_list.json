@@ -1,7 +1,7 @@
 {
     "CONCAT_DATA": true,
     "FEATURE_ENGINEERING": true,
-    "GRID_SEARCH": true,
+    "GRID_SEARCH": false,
     "STACKNET": true,
     "VALIDATION_DOWNSAMPLING_GEN": true,
     "VALIDATION_DOWNSAMPLING_GEN_INDEX": true,

@@ -7,7 +7,9 @@ from keras.regularizers import l1, l2, l1_l2
 from keras.models import Model
 from keras.optimizers import Adam
 import numpy as np
+import pandas as pd
 from sklearn.metrics import roc_auc_score
+import pdb
 import logging
 module_logger = logging.getLogger(__name__)
 
@@ -16,11 +18,17 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
     """
     Params:
         nn_params: dict
-        X_train, X_val, X_test: pandas dataframe
+        X_train, X_val, X_test: pandas dataframe (or 2D np array, which will be converted to df)
         categorical_features: list of columns names
     """
+    # convert to df just in case they are not df
+    X_train = pd.DataFrame(X_train)
+    X_test = pd.DataFrame(X_test)
     if X_val is None:
         X_val = X_train.tail(1)
+    else:
+        X_val = pd.DataFrame(X_val)
+
     train_dict = {}
     valid_dict = {}
     test_dict = {}
