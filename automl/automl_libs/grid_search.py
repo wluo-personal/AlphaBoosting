@@ -8,6 +8,7 @@ import lightgbm as lgb
 from keras.callbacks import LearningRateScheduler, EarlyStopping, ModelCheckpoint
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
+from sklearn.ensemble import BaggingClassifier
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import roc_auc_score
 from automl_libs import utils, nn_libs
@@ -73,13 +74,22 @@ def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
 def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, verbose_eval,
             do_preds, X_test, preds_save_path):
+    """
+    TODO: untested. bad performance, hence not priority.
+    """
     params, seed = gs_params_gen(gs_model)
     metric = params['metric']
     md = None
     if gs_model == 'svc':
-        md = SVC(C=params['C'], probability=True)  # prob = True enables predict_proba
+        from sklearn.calibration import CalibratedClassifierCV
+        from sklearn.svm import LinearSVC
+        md = CalibratedClassifierCV(LinearSVC(**params))
+        # n_estimators = 8
+        # max_samples = 0.2
+        # md = BaggingClassifier(lsvc, max_samples=max_samples,
+        #                        n_estimators=n_estimators, n_jobs=n_estimators)
     elif gs_model == 'logreg':
-        md = LogisticRegression(penalty=params['penalty'], dual=params['dual'], C=params['C'], n_jobs=8)
+        md = LogisticRegression()#penalty=params['penalty'], dual=params['dual'], C=params['C'], n_jobs=8)
     run_id = utils.get_random_string()  # also works as the index of the result dataframe
 
     # import pprint
@@ -98,9 +108,9 @@ def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
         params['cv'] = True
     else:
         md.fit(X_train, y_train)
-        val_pred = md.predict_proba(X_val)
-        train_pred = md.predict_proba(X_train)
+        train_pred = md.predict_proba(X_train)[:, 1]
         train_metric = roc_auc_score(y_train, train_pred)
+        val_pred = md.predict_proba(X_val)[:, 1]
         val_metric = roc_auc_score(y_val, val_pred)
         params['val_' + metric] = val_metric
         params['train_' + metric] = train_metric
@@ -131,6 +141,7 @@ def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
         module_logger.info('{} predictions({}) saved in {}.'.format(gs_model, run_id, preds_save_path))
 
     return params, run_id
+
 
 def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, verbose_eval,

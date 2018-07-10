@@ -320,8 +320,8 @@ class AlphaBoosting:
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
-        train = train.head(10000)
-        val = val.head(10000)
+        train = train.head(100000)
+        # val = val.head(100000)
         # TODO:
         # remove .head(X)
         self.logger.info('Data retrieved. Shape: train {} | val {} | test {} | '
