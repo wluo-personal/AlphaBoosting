@@ -5,7 +5,6 @@ from automl_libs import utils, grid_search, nn_libs, stacknet
 from enum import Enum
 import pdb
 
-
 class AlphaBoosting:
 
     class Stage(Enum):
@@ -27,11 +26,11 @@ class AlphaBoosting:
             raise Exception('config file can not be found')
         self.config_dict = json.load(open(config_file, 'r'))
         self.ROOT = self.config_dict['project_root']
-               
+
         # 1. run_record need to to provides so that the previous run(if there is one) info can
         # be loaded, which will determine what need to be rerun and what don't
         # 2. don't create this file or modify this file
-            
+
         self.features_to_gen = features_to_gen
         self.gs_params_gen = gs_params_gen
 
@@ -42,8 +41,8 @@ class AlphaBoosting:
         self.test_data_url = self.config_dict['test_data_url']
         self.label = self.config_dict['label']
         self.down_sampling_amt = self.config_dict['down_sampling_amt']
-        self.down_sampling_ratio = self.config_dict['down_sampling_ratio'] 
-        
+        self.down_sampling_ratio = self.config_dict['down_sampling_ratio']
+
         # read data and determine validation set
         self._read_data()
         if self.config_dict['validation_index'] is not None:
@@ -56,7 +55,7 @@ class AlphaBoosting:
                 raise ValueError('since validation_index is null in config file, validation_ratio must be provided')
             self.validation_ratio = val_ratio
             self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
-            
+
         downsampling_amount_changed = False
         down_sampling_ratio_changed = False
         val_index_changed = False
