@@ -13,7 +13,7 @@ import logging, gc
 module_logger = logging.getLogger(__name__)
 
 
-def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
+def layer1(train, test, y_test, categorical_cols, feature_cols, label_cols, top_n_gs,
            oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     Params:
@@ -92,16 +92,14 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
                     base_layer_results_repo.add_score(model_data, val_score)
                     base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
 
-                # for debug purpose, read in testY  # TODO, remove after development
-                import numpy as np
-                testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-                for k, v in layer1_est_preds.items():
-                    base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(testY, v))
+                if y_test is not None:
+                    for k, v in layer1_est_preds.items():
+                        base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
 
                 base_layer_results_repo.save()
 
 
-def layer2(train, label_cols, oof_path, metric, save_report):
+def layer2(train, y_test, label_cols, oof_path, metric, save_report):
     """
     Params:
         train: DataFrame with label
@@ -172,11 +170,9 @@ def layer2(train, label_cols, oof_path, metric, save_report):
         base_layer_results_repo.add_score(model_data, layer2_cv_score[model_data])
         base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2_chosen_model_data[model_id])
 
-    # for debug purpose, read in testY  # TODO, remove after development
-    import numpy as np
-    testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-    for k, v in layer2_est_preds.items():
-        base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(testY, v))
+    if y_test is not None:
+        for k, v in layer2_est_preds.items():
+            base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
 
     base_layer_results_repo.save()
 

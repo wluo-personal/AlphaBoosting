@@ -19,7 +19,7 @@ module_logger = logging.getLogger(__name__)
 
 def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
        gs_record_dir, gs_params_gen, gs_models, cv, nfold,
-       verbose_eval, do_preds, X_test, preds_save_path, suppress_warning, **kwargs):
+       verbose_eval, do_preds, X_test, y_test, preds_save_path, suppress_warning, **kwargs):
 
     if suppress_warning:
         import warnings
@@ -36,15 +36,15 @@ def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
                 if gs_model == 'logreg' or gs_model == 'svc':
                     params, run_id = _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                      gs_params_gen, gs_model, cv, nfold, verbose_eval,
-                                     do_preds, X_test, preds_save_path)
+                                     do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'lgb':
                     params, run_id = _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                      gs_params_gen, gs_model, cv, nfold, verbose_eval,
-                                     do_preds, X_test, preds_save_path)
+                                     do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'nn':
                     params, run_id = _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                     gs_params_gen, gs_model, verbose_eval,
-                                    do_preds, X_test, preds_save_path)
+                                    do_preds, X_test, y_test, preds_save_path)
 
                 # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
                 for k, v in params.items():
@@ -73,7 +73,7 @@ def gs(X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
 
 def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, verbose_eval,
-            do_preds, X_test, preds_save_path):
+            do_preds, X_test, y_test, preds_save_path):
     """
     TODO: untested. bad performance, hence not priority.
     """
@@ -128,14 +128,12 @@ def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
         train_pred = md.predict_proba(X_train)[:, 1]
         module_logger.info('Training done. Train_{}: {:.5f} | {} features'
                            .format(metric, roc_auc_score(y_train, train_pred), X_train.shape[1]))
-        y_test = md.predict_proba(X_test)[:, 1]
+        y_test_pred = md.predict_proba(X_test)[:, 1]
 
-        # for debug purpose, read in testY  ########################################
-        testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-        print('(_{}_gs) roc of test: {}'.format(gs_model, roc_auc_score(testY, y_test)))
-        # for debug purpose, read in testY  ########################################
+        if y_test is not None:
+            module_logger.info('(_{}_gs) roc of test: {}'.format(gs_model, roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + gs_model + '_preds_{}'.format(run_id), y_test)
+        np.save(preds_save_path + gs_model + '_preds_{}'.format(run_id), y_test_pred)
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         params['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('{} predictions({}) saved in {}.'.format(gs_model, run_id, preds_save_path))
@@ -145,7 +143,7 @@ def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
 def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, verbose_eval,
-            do_preds, X_test, preds_save_path):
+            do_preds, X_test, y_test, preds_save_path):
     lgb_params, seed = gs_params_gen(gs_model)
     metric = lgb_params['metric']
     run_id = utils.get_random_string()  # also works as the index of the result dataframe
@@ -197,14 +195,12 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
                            .format(model.current_iteration(), metric,
                                    model.best_score['training'][metric], model.num_feature()))
         del lgb_all_data; gc.collect()
-        y_test = model.predict(X_test)
+        y_test_pred = model.predict(X_test)
 
-        # for debug purpose, read in testY  ########################################
-        testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-        print('(_lgb_gs) roc of test: {}'.format(roc_auc_score(testY, y_test)))
-        # for debug purpose, read in testY  ########################################
+        if y_test is not None:
+            module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + 'lgb_preds_{}'.format(run_id), y_test)
+        np.save(preds_save_path + 'lgb_preds_{}'.format(run_id), y_test_pred)
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         lgb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('LGB predictions({}) saved in {}.'.format(run_id, preds_save_path))
@@ -218,7 +214,7 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
 def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
            gs_params_gen, gs_model, verbose_eval,
-           do_preds, X_test, preds_save_path):
+           do_preds, X_test, y_test, preds_save_path):
     nn_params, seed = gs_params_gen(gs_model)
     # time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
     run_id = utils.get_random_string()
@@ -277,14 +273,12 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
         predict_start_time = time.time()
         module_logger.info('[do_preds] is True, generating predictions ...')
         model.load_weights(saved_model_file_name)
-        y_test = model.predict(test_dict, batch_size=pred_batch_size, verbose=verbose_eval)
+        y_test_pred = model.predict(test_dict, batch_size=pred_batch_size, verbose=verbose_eval)
 
-        # for debug purpose, read in testY  ########################################
-        testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-        print('(_nn_gs) roc of test: {}'.format(roc_auc_score(testY, y_test)))
-        # for debug purpose, read in testY  ########################################
+        if y_test is not None:
+            module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + 'nn_preds_{}'.format(run_id), y_test)
+        np.save(preds_save_path + 'nn_preds_{}'.format(run_id), y_test_pred)
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         nn_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('NN predictions({}) saved in {}.'.format(run_id, preds_save_path))

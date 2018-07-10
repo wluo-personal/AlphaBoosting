@@ -5,6 +5,7 @@ from automl_libs import utils, grid_search, nn_libs, stacknet
 from enum import Enum
 import pdb
 
+
 class AlphaBoosting:
 
     class Stage(Enum):
@@ -26,11 +27,11 @@ class AlphaBoosting:
             raise Exception('config file can not be found')
         self.config_dict = json.load(open(config_file, 'r'))
         self.ROOT = self.config_dict['project_root']
-
+               
         # 1. run_record need to to provides so that the previous run(if there is one) info can
         # be loaded, which will determine what need to be rerun and what don't
         # 2. don't create this file or modify this file
-
+            
         self.features_to_gen = features_to_gen
         self.gs_params_gen = gs_params_gen
 
@@ -41,8 +42,8 @@ class AlphaBoosting:
         self.test_data_url = self.config_dict['test_data_url']
         self.label = self.config_dict['label']
         self.down_sampling_amt = self.config_dict['down_sampling_amt']
-        self.down_sampling_ratio = self.config_dict['down_sampling_ratio']
-
+        self.down_sampling_ratio = self.config_dict['down_sampling_ratio'] 
+        
         # read data and determine validation set
         self._read_data()
         if self.config_dict['validation_index'] is not None:
@@ -55,7 +56,7 @@ class AlphaBoosting:
                 raise ValueError('since validation_index is null in config file, validation_ratio must be provided')
             self.validation_ratio = val_ratio
             self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
-
+            
         downsampling_amount_changed = False
         down_sampling_ratio_changed = False
         val_index_changed = False
@@ -258,7 +259,7 @@ class AlphaBoosting:
     def _grid_search(self, to_do_dict):
         stage = self.Stage.GRID_SEARCH.name
         if not to_do_dict[stage]:
-            train, val, test, categorical_features, feature_cols, label_col = self._get_final_data()
+            train, val, test, y_test, categorical_features, feature_cols, label_col = self._get_final_data()
             X_train = train[feature_cols]
             y_train = train[label_col]
             X_val = val[feature_cols]
@@ -279,7 +280,7 @@ class AlphaBoosting:
                            gs_record_dir=gs_record_dir,
                            gs_params_gen=self.gs_params_gen, gs_models=gs_models,
                            cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
-                           do_preds=gs_do_preds, X_test=X_test,
+                           do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
                            preds_save_path=self.OUTDIR+'gs_saved_preds/',
                            suppress_warning=gs_sup_warning)
             del train, val, test; gc.collect()
@@ -292,16 +293,16 @@ class AlphaBoosting:
             if not os.path.exists(oof_path):
                 os.makedirs(oof_path)
             gs_result_path = self.OUTDIR
-            train, val, test, categorical_features, feature_cols, label_cols = self._get_final_data()
+            train, val, test, y_test, categorical_features, feature_cols, label_cols = self._get_final_data()
             # convert label_cols to list so that y_train will be a dataframe, which is required stacknet layers
             if not isinstance(label_cols, list):
                 label_cols = [label_cols]
             train = pd.concat([train, val])
-            stacknet.layer1(train, test, categorical_features, feature_cols, label_cols,
+            stacknet.layer1(train, test, y_test, categorical_features, feature_cols, label_cols,
                             top_n_gs=self.config_dict['top_n_gs'],
                             oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
                             metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
-            stacknet.layer2(train, label_cols, oof_path, metric=self.config_dict['report_metric'],
+            stacknet.layer2(train, y_test, label_cols, oof_path, metric=self.config_dict['report_metric'],
                             save_report=True)
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
@@ -313,21 +314,24 @@ class AlphaBoosting:
             train = pd.read_pickle(self.TEMP_DATADIR+'0.pkl')
         val = pd.read_pickle(self.TEMP_DATADIR+'val.pkl')
         test = pd.read_pickle(self.TEMP_DATADIR+'test.pkl')
+        y_test = np.load(self.config_dict['test_label_url'])  # could be none
+        if y_test is not None:
+            assert len(test) == len(y_test)
 
         not_features = self.config_dict['not_features']
         categorical_features = list(set(self.config_dict['categorical_features']) - set(not_features))
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
-        train = train.head(100000)
+        train = train.head(50000)
         # val = val.head(100000)
         # TODO:
         # remove .head(X)
-        self.logger.info('Data retrieved. Shape: train {} | val {} | test {} | '
+        self.logger.info('Data retrieved. Shape: train {} | val {} | test {} | contain test label: {} | '
                          '{} cat features | {} total features | y name: {}'
-                         .format(train.shape, val.shape, test.shape,
+                         .format(train.shape, val.shape, test.shape, False if y_test is None else True,
                                  len(categorical_features), len(feature_cols), label_col))
-        return train, val, test, categorical_features, feature_cols, label_col
+        return train, val, test, y_test, categorical_features, feature_cols, label_col
 
         
     # support functions

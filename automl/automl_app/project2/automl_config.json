@@ -3,6 +3,7 @@
     "last_run_record_filename": "last_run_record.json",
     "train_data_url": "data/train_1M.pkl",
     "test_data_url": "data/testX_100k.pkl",
+    "test_label_url": "data/testY_100k.npy",
     "down_sampling_amt": 0,
     "down_sampling_ratio": null, 
     "validation_index": null, 
