@@ -17,7 +17,7 @@ class AlphaBoosting:
         GRID_SEARCH = 6
         STACKNET = 7
 
-    def __init__(self, config_file, features_to_gen, gs_params_gen):
+    def __init__(self, config_file, features_to_gen, params_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
         self.logger.info('='*10+'NEW RUN'+'='*10)
 
@@ -33,7 +33,7 @@ class AlphaBoosting:
         # 2. don't create this file or modify this file
             
         self.features_to_gen = features_to_gen
-        self.gs_params_gen = gs_params_gen
+        self.params_gen = params_gen
 
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
@@ -278,7 +278,7 @@ class AlphaBoosting:
             grid_search.gs(X_train, y_train, X_val, y_val,
                            categorical_features, search_rounds=gs_search_rounds,
                            gs_record_dir=gs_record_dir,
-                           gs_params_gen=self.gs_params_gen, gs_models=gs_models,
+                           gs_params_gen=self.params_gen, gs_models=gs_models,
                            cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
                            do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
                            preds_save_path=self.OUTDIR+'gs_saved_preds/',
@@ -302,7 +302,8 @@ class AlphaBoosting:
                             top_n_gs=self.config_dict['top_n_gs'],
                             oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
                             metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
-            stacknet.layer2(train, y_test, label_cols, oof_path, metric=self.config_dict['report_metric'],
+            stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
+                            oof_path=oof_path, metric=self.config_dict['report_metric'],
                             save_report=True)
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
@@ -314,8 +315,10 @@ class AlphaBoosting:
             train = pd.read_pickle(self.TEMP_DATADIR+'0.pkl')
         val = pd.read_pickle(self.TEMP_DATADIR+'val.pkl')
         test = pd.read_pickle(self.TEMP_DATADIR+'test.pkl')
-        y_test = np.load(self.config_dict['test_label_url'])  # could be none
-        if y_test is not None:
+        y_test_url = self.config_dict['test_label_url']
+        y_test = None
+        if y_test_url is not None:
+            y_test = np.load(y_test_url)  # could be none
             assert len(test) == len(y_test)
 
         not_features = self.config_dict['not_features']
