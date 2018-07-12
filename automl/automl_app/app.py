@@ -19,7 +19,7 @@ class AlphaBoosting:
 
     def __init__(self, config_file, features_to_gen, params_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
-        self.logger.info('='*10+'NEW RUN'+'='*10)
+        self.logger.info('='*10+'START'+'='*10)
 
         if config_file is None:
             raise Exception('config file can not be None')
