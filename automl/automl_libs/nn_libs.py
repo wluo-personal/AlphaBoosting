@@ -52,7 +52,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             # construct categorical input nodes
             cat_input = Input(shape=(1,), name=str(col))
             feature_input_list.append(cat_input)
-            embed_input_dim = np.max([X_train[col].max(), X_val[col].max(), X_test[col].max()]) + 1
+            embed_input_dim = np.max([X_train[col].nunique(), X_val[col].nunique(), X_test[col].nunique()]) + 1
             # why +1 in embed_input_dim: because categorical cols are assumed labelencoded, which start from 0
             # so e.g. if X_train[col].max() returns 3, it means there are 3 + 1 categories: 0,1,2,3
 
@@ -67,8 +67,9 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             embed_node = Embedding(embed_input_dim, embed_output_dimension)(cat_input)
             embed_nodes_list.append(embed_node)
         embed_layer = concatenate(embed_nodes_list)
-        dropout_layer = SpatialDropout1D(nn_params['drop_rate'])(embed_layer)
-        categorical_node = Flatten()(dropout_layer)
+        if nn_params['cat_emb_drop_rate'] > 0:
+            embed_layer = SpatialDropout1D(nn_params['cat_emb_drop_rate'])(embed_layer)
+        categorical_node = Flatten()(embed_layer)
 
     if len(numerical_features) > 0:
         key_for_numerical_features = 'numerical_features'
@@ -81,7 +82,8 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         for i, dense_units in enumerate(nn_params['num_layers_dense_units']):
             numerical_node = functional_dense(dense_units, numerical_node,
                                               batch_norm=True, act='relu',
-                                              dropout=nn_params['drop_rate'], name='numerical_{}'.format(i))
+                                              dropout=nn_params['num_layers_drop_rate'],
+                                              name='numerical_{}'.format(i))
 
     if len(numerical_features) > 0 and len(categorical_features) > 0:
         x = concatenate([categorical_node, numerical_node])
@@ -93,7 +95,8 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         return 0  # raise exception?
 
     for i, dense_units in enumerate(nn_params['combined_layers_dense_units']):
-        x = functional_dense(dense_units, x, dropout=nn_params['drop_rate'], name='combined_{}'.format(i))
+        x = functional_dense(dense_units, x, dropout=nn_params['combined_layers_drop_rate'],
+                             name='combined_{}'.format(i))
 
     nn_final_outputs = Dense(1, activation='sigmoid')(x)
     model = Model(inputs=feature_input_list, outputs=nn_final_outputs)
@@ -117,7 +120,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         optimizer = Adam(lr=lr_init)
 
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-    model.summary()
+    # model.summary()
 
     return model, train_dict, valid_dict, test_dict
 
