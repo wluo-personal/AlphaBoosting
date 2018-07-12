@@ -8,6 +8,7 @@ from keras.models import Model
 from keras.optimizers import Adam
 import numpy as np
 import pandas as pd
+import re
 from sklearn.metrics import roc_auc_score
 import pdb
 import logging
@@ -77,8 +78,8 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         num_input = Input(shape=(len(numerical_features),), name=key_for_numerical_features)
         feature_input_list.append(num_input)
         numerical_node = num_input
-        for i in range(nn_params['num_dense_n_layers']):
-            numerical_node = functional_dense(nn_params['dense_units'], numerical_node,
+        for i, dense_units in enumerate(nn_params['num_layers_dense_units']):
+            numerical_node = functional_dense(dense_units, numerical_node,
                                               batch_norm=True, act='relu',
                                               dropout=nn_params['drop_rate'], name='numerical_{}'.format(i))
 
@@ -91,8 +92,8 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
     else:
         return 0  # raise exception?
 
-    for i in range(nn_params['combined_dense_n_layers']):
-        x = functional_dense(nn_params['dense_units'], x, dropout=nn_params['drop_rate'], name='combined_{}'.format(i))
+    for i, dense_units in enumerate(nn_params['combined_layers_dense_units']):
+        x = functional_dense(dense_units, x, dropout=nn_params['drop_rate'], name='combined_{}'.format(i))
 
     nn_final_outputs = Dense(1, activation='sigmoid')(x)
     model = Model(inputs=feature_input_list, outputs=nn_final_outputs)
@@ -116,12 +117,16 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         optimizer = Adam(lr=lr_init)
 
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-    # model.summary()
+    model.summary()
 
     return model, train_dict, valid_dict, test_dict
 
 
 def functional_dense(dense_units, x, batch_norm=False, act='relu', lw1=0.0, dropout=0, name=''):
+    if isinstance(dense_units, str):
+        module_logger.warning('dense_unit {} is a string (it might be read from csv),'
+                              ' converting it to int...'.format(dense_units))
+        dense_units = int(dense_units)
     if lw1 == 0.0:
         x = Dense(dense_units, name=name + '_dense')(x)
     else:
