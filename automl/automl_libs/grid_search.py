@@ -241,17 +241,17 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
     cb.extend([
         EarlyStopping(monitor=nn_params['monitor'], mode=nn_params['mode'], patience=nn_params['patience'], verbose=2),
         nn_libs.LearningRateTracker(include_on_batch=False),
-        ModelCheckpoint(saved_model_file_name, monitor='roc_auc_val', verbose=1, save_best_only=True, mode='max')
+        ModelCheckpoint(saved_model_file_name, monitor=nn_params['monitor'], verbose=1, save_best_only=True, mode='max')
         # LearningRateScheduler(lambda x: lr * (lr_decay ** x))
     ])
     model.fit(train_dict, y_train, validation_data=[valid_dict, y_val],
               epochs=nn_params['max_ep'], batch_size=nn_params['batch_size'], verbose=verbose_eval, callbacks=cb)
 
     hist = model.history
-    bst_epoch = np.argmax(hist.history['roc_auc_val'])
+    bst_epoch = np.argmax(hist.history[nn_params['monitor']])
     if nn_params['monitor'] == 'val_auc':
-        val_auc = hist.history['roc_auc_val'][bst_epoch]
-        nn_params['val_auc'] = val_auc
+        val_auc = hist.history['val_auc'][bst_epoch]
+        nn_params['val_auc'] = val_auc  # hence the val_auc score will be later saved in csv
         module_logger.info('val_auc: {:.5f}'.format(val_auc))
     trn_loss = hist.history['loss'][bst_epoch]
     trn_acc = hist.history['acc'][bst_epoch]  # TODO: acc might not be there if regression problem
