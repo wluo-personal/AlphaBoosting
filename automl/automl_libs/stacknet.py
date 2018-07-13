@@ -70,7 +70,6 @@ def layer1(train, test, y_test, categorical_cols, feature_cols, label_cols, top_
 
                     # [50, 20] is converted to "[50, 20]" after saved in csv
                     # so convert them back to [50, 20]
-                    pdb.set_trace()
                     if 'int_list' in params:
                         for int_list_name in ast.literal_eval(ast.literal_eval(params['int_list'])):
                             params[int_list_name] = ast.literal_eval(ast.literal_eval(params[int_list_name]))
@@ -150,7 +149,8 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, metric, save_report)
     # layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018, metric=metric, metrics_callback=metrics_callback)
+        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols,
+                           5, 2018, metric=metric, metrics_callback=metrics_callback)
 
     base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
                                 layer2_cv_score, layer2_model_data_list)

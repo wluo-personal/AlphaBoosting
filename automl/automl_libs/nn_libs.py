@@ -195,8 +195,8 @@ class RocAucMetricCallback(Callback):
             self._compute_auc(logs)
 
     def on_train_begin(self, logs={}):
-        if not ('roc_auc_val' in self.params['metrics']):
-            self.params['metrics'].append('roc_auc_val')
+        if not ('val_auc' in self.params['metrics']):
+            self.params['metrics'].append('val_auc')
 
     def on_train_end(self, logs={}):
         pass
@@ -208,9 +208,9 @@ class RocAucMetricCallback(Callback):
         self._compute_auc(logs)
 
     def _compute_auc(self, logs):
-        logs['roc_auc_val'] = float('-inf')
+        logs['val_auc'] = float('-inf')
         if self.validation_data:
-            logs['roc_auc_val'] = \
+            logs['val_auc'] = \
                 roc_auc_score(self.y_val,
                               self.model.predict(self.X_val,
                                                  batch_size=self.predict_batch_size))
