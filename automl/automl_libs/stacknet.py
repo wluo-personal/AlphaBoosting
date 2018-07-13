@@ -9,11 +9,12 @@ import pandas as pd
 from os import listdir
 import pdb
 import time
+import ast
 import logging, gc
 module_logger = logging.getLogger(__name__)
 
 
-def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
+def layer1(train, test, y_test, categorical_cols, feature_cols, label_cols, top_n_gs,
            oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     Params:
@@ -66,6 +67,13 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
                     params = v
                     module_logger.info('using {} params: {} to do oof'.format(model_type, k))
                     module_logger.debug(params)
+
+                    # [50, 20] is converted to "[50, 20]" after saved in csv
+                    # so convert them back to [50, 20]
+                    if 'int_list' in params:
+                        for int_list_name in ast.literal_eval(ast.literal_eval(params['int_list'])):
+                            params[int_list_name] = ast.literal_eval(ast.literal_eval(params[int_list_name]))
+
                     params['categorical_feature'] = categorical_cols
                     if model_type == 'lgb':
                         params['verbose_eval'] = int(params['best_round'] / 5)
@@ -92,16 +100,14 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
                     base_layer_results_repo.add_score(model_data, val_score)
                     base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
 
-                # for debug purpose, read in testY  # TODO, remove after development
-                import numpy as np
-                testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-                for k, v in layer1_est_preds.items():
-                    base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(testY, v))
+                if y_test is not None:
+                    for k, v in layer1_est_preds.items():
+                        base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
 
                 base_layer_results_repo.save()
 
 
-def layer2(train, label_cols, oof_path, metric, save_report):
+def layer2(train, y_test, label_cols, params_gen, oof_path, metric, save_report):
     """
     Params:
         train: DataFrame with label
@@ -126,26 +132,7 @@ def layer2(train, label_cols, oof_path, metric, save_report):
     layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
     model_id = utils.get_random_string()
-    nn_model_param = {
-        'nn_seed': int(time.time() * 1000000) % 45234634,
-        'ep_for_lr': 1,
-        'lr_init': 0.01,
-        'lr_fin': 0.01,  # if == lr_init, then no lr decay
-        'batch_size': 128,
-        "pred_batch_size": 50000,
-        'best_epoch': 1,
-        'patience': 1,
-        'categorical_feature': [],
-        'cat_emb_outdim': 50,  # could be a constant or a dict (col name:embed out dim). e.g.:
-        # embed_outdim = [3, 3, 8, 8, 3]
-        # embed_outdim_dict = dict(zip(X_train.columns.values, embed_outdim))
-        'dense_units': 50,
-        'num_dense_n_layers': 1,
-        'drop_rate': 0.2,
-        'combined_dense_n_layers': 1,
-        'monitor': 'val_auc',  # or val_loss (MUST HAVE)
-        'mode': 'max'  # MUST HAVE
-    }
+    nn_model_param, _ = params_gen('stacknet_layer2_nn')
     model_name = model_id+'__'+ModelName.NN.name
     model_pool[model_name] = NNBLE(params=nn_model_param)
     chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
@@ -162,7 +149,8 @@ def layer2(train, label_cols, oof_path, metric, save_report):
     # layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018, metric=metric, metrics_callback=metrics_callback)
+        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols,
+                           5, 2018, metric=metric, metrics_callback=metrics_callback)
 
     base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
                                 layer2_cv_score, layer2_model_data_list)
@@ -172,11 +160,9 @@ def layer2(train, label_cols, oof_path, metric, save_report):
         base_layer_results_repo.add_score(model_data, layer2_cv_score[model_data])
         base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2_chosen_model_data[model_id])
 
-    # for debug purpose, read in testY  # TODO, remove after development
-    import numpy as np
-    testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-    for k, v in layer2_est_preds.items():
-        base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(testY, v))
+    if y_test is not None:
+        for k, v in layer2_est_preds.items():
+            base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
 
     base_layer_results_repo.save()
 

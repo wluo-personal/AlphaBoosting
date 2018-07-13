@@ -8,6 +8,7 @@ from keras.models import Model
 from keras.optimizers import Adam
 import numpy as np
 import pandas as pd
+import re
 from sklearn.metrics import roc_auc_score
 import pdb
 import logging
@@ -51,7 +52,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             # construct categorical input nodes
             cat_input = Input(shape=(1,), name=str(col))
             feature_input_list.append(cat_input)
-            embed_input_dim = np.max([X_train[col].max(), X_val[col].max(), X_test[col].max()]) + 1
+            embed_input_dim = np.max([X_train[col].nunique(), X_val[col].nunique(), X_test[col].nunique()]) + 1
             # why +1 in embed_input_dim: because categorical cols are assumed labelencoded, which start from 0
             # so e.g. if X_train[col].max() returns 3, it means there are 3 + 1 categories: 0,1,2,3
 
@@ -66,8 +67,9 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             embed_node = Embedding(embed_input_dim, embed_output_dimension)(cat_input)
             embed_nodes_list.append(embed_node)
         embed_layer = concatenate(embed_nodes_list)
-        dropout_layer = SpatialDropout1D(nn_params['drop_rate'])(embed_layer)
-        categorical_node = Flatten()(dropout_layer)
+        if nn_params['cat_emb_drop_rate'] > 0:
+            embed_layer = SpatialDropout1D(nn_params['cat_emb_drop_rate'])(embed_layer)
+        categorical_node = Flatten()(embed_layer)
 
     if len(numerical_features) > 0:
         key_for_numerical_features = 'numerical_features'
@@ -77,10 +79,11 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         num_input = Input(shape=(len(numerical_features),), name=key_for_numerical_features)
         feature_input_list.append(num_input)
         numerical_node = num_input
-        for i in range(nn_params['num_dense_n_layers']):
-            numerical_node = functional_dense(nn_params['dense_units'], numerical_node,
+        for i, dense_units in enumerate(nn_params['num_layers_dense_units']):
+            numerical_node = functional_dense(dense_units, numerical_node,
                                               batch_norm=True, act='relu',
-                                              dropout=nn_params['drop_rate'], name='numerical_{}'.format(i))
+                                              dropout=nn_params['num_layers_drop_rate'],
+                                              name='numerical_{}'.format(i))
 
     if len(numerical_features) > 0 and len(categorical_features) > 0:
         x = concatenate([categorical_node, numerical_node])
@@ -91,8 +94,9 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
     else:
         return 0  # raise exception?
 
-    for i in range(nn_params['combined_dense_n_layers']):
-        x = functional_dense(nn_params['dense_units'], x, dropout=nn_params['drop_rate'], name='combined_{}'.format(i))
+    for i, dense_units in enumerate(nn_params['combined_layers_dense_units']):
+        x = functional_dense(dense_units, x, dropout=nn_params['combined_layers_drop_rate'],
+                             name='combined_{}'.format(i))
 
     nn_final_outputs = Dense(1, activation='sigmoid')(x)
     model = Model(inputs=feature_input_list, outputs=nn_final_outputs)
@@ -122,6 +126,10 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
 
 
 def functional_dense(dense_units, x, batch_norm=False, act='relu', lw1=0.0, dropout=0, name=''):
+    if isinstance(dense_units, str):
+        module_logger.warning('dense_unit {} is a string (it might be read from csv),'
+                              ' converting it to int...'.format(dense_units))
+        dense_units = int(dense_units)
     if lw1 == 0.0:
         x = Dense(dense_units, name=name + '_dense')(x)
     else:
@@ -187,8 +195,8 @@ class RocAucMetricCallback(Callback):
             self._compute_auc(logs)
 
     def on_train_begin(self, logs={}):
-        if not ('roc_auc_val' in self.params['metrics']):
-            self.params['metrics'].append('roc_auc_val')
+        if not ('val_auc' in self.params['metrics']):
+            self.params['metrics'].append('val_auc')
 
     def on_train_end(self, logs={}):
         pass
@@ -200,9 +208,9 @@ class RocAucMetricCallback(Callback):
         self._compute_auc(logs)
 
     def _compute_auc(self, logs):
-        logs['roc_auc_val'] = float('-inf')
+        logs['val_auc'] = float('-inf')
         if self.validation_data:
-            logs['roc_auc_val'] = \
+            logs['val_auc'] = \
                 roc_auc_score(self.y_val,
                               self.model.predict(self.X_val,
                                                  batch_size=self.predict_batch_size))
