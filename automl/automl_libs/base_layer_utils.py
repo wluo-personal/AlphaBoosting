@@ -277,8 +277,13 @@ class BaseLayerResultsRepo:
             raise ValueError('model_data_id is not found in the repo. function [add] needs '
                              'to be run first so that this model_data is in the repo')
         self._status_report[model_data_id][report_key] = report_value
+        self.logger.info('StackNet report updated: {}: {} => {}'.format(model_data_id, report_key, report_value))
 
     def get_report(self, as_df=True):
+        """
+        :param as_df: boolean. True: return df. False: return dict
+        :return: Return report (and convert it from dict to df if as_df is true)
+        """
         if as_df:
             return pd.DataFrame.from_dict(self._status_report, orient='index')\
                 .reset_index().rename(columns={'index': 'model_data'})
@@ -384,6 +389,11 @@ class BaseLayerResultsRepo:
             save_obj(self._base_layer_est_preds, 'models_base_layer_est_preds', self.filepath)
             save_obj(self._base_layer_est_scores, 'models_base_layer_est_scores', self.filepath)
             save_obj(self._status_report, 'status_report', self.filepath)
+            self.logger.info('StackNet data saved for: {}'.format(self._model_data_id_list))
+            stacknet_report_df = self.get_report()
+            stacknet_report_file = self.filepath + 'stacknet_report.csv'
+            stacknet_report_df.to_csv(stacknet_report_file, index=False)
+            self.logger.info('StackNet report saved at {}'.format(stacknet_report_file))
 
 
 def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=True, seed=1001, metrics_callback=None):

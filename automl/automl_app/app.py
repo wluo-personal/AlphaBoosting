@@ -304,7 +304,7 @@ class AlphaBoosting:
                             metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
             stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
                             oof_path=oof_path, metric=self.config_dict['report_metric'],
-                            save_report=True)
+                            layer1_thresh=self.config_dict['layer1_thresh'], save_report=True)
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
 
