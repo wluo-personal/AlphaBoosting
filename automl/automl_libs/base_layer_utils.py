@@ -524,9 +524,11 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
                     oof_train, oof_mean_test, cv_score = \
                         get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
                                 stratified=True, seed=seed, metrics_callback=metrics_callback)
+                    module_logger.info('oof is done')
                 else:
                     raise ValueError('nfolds of oof can NOT be 0!')
 
+                module_logger.info('Training using all data and gen prediction for submission...')
                 if type(model).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
                     model.train(x_train, y_train, None, None, x_test)
                     est_preds = model.predict('x_test')

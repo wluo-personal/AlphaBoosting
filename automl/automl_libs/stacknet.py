@@ -14,7 +14,7 @@ import logging, gc
 module_logger = logging.getLogger(__name__)
 
 
-def layer1(train, test, y_test, categorical_cols, feature_cols, label_cols, top_n_gs,
+def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, top_n_gs,
            oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     Params:
@@ -26,12 +26,12 @@ def layer1(train, test, y_test, categorical_cols, feature_cols, label_cols, top_
             e.g. ['label'] or ['label1', 'label2']
         top_n_gs: int. choose top N from grid search results of each model
     """
-    X_train_ordinal = train[feature_cols]  # still df
+    X_train = train[feature_cols]  # still df
     y_train = train[label_cols]  # make sure it's df
-    X_test_ordinal = test[feature_cols] # still df
+    X_test = test[feature_cols] # still df
 
     bldr = BaseLayerDataRepo()
-    bldr.add_data('flight_data_ordinal', X_train_ordinal, X_test_ordinal, y_train, label_cols,
+    bldr.add_data(data_name, X_train, X_test, y_train, label_cols,
                   [ModelName.LGB.name, ModelName.NN.name])
     # bldr.add_data('flight_data_one_hot', X_train_one_hot, X_test_one_hot, y_train, label_cols,
     #               [ModelName.LOGREG, ModelName.XGB])
@@ -136,22 +136,19 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thres
     layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
     layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
-    model_id = utils.get_random_string()
-    nn_model_param, _ = params_gen('stacknet_layer2_nn')
-    model_name = model_id+'__'+ModelName.NN.name
-    model_pool[model_name] = NNBLE(params=nn_model_param)
-    chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-        base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=layer1_thresh)
-    layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-    layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
-
     # model_id = utils.get_random_string()
-    # model_name = model_id+'__'+ModelName.LOGREG.name
-    # model_pool[model_name] = SklearnBLE(DecisionTreeClassifier)
+    # nn_model_param, _ = params_gen('stacknet_layer2_nn')
+    # model_name = model_id+'__'+ModelName.NN.name
+    # model_pool[model_name] = NNBLE(params=nn_model_param)
     # chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-    #     base_layer_results_repo.get_results(layer='layer1', threshold=0.713)
+    #     base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=layer1_thresh)
     # layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
     # layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+
+    # decision tree: bad performance
+    # ...
+    # model_pool[model_name] = SklearnBLE(DecisionTreeClassifier)
+    # ...
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
         compute_layer2_oof(model_pool, layer2_inputs, train, label_cols,

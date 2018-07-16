@@ -1,6 +1,7 @@
 {
     "project_root": "./",
     "last_run_record_filename": "last_run_record.json",
+    "data_name": "ordinal",
     "train_data_url": "data/train_1M.pkl",
     "test_data_url": "data/testX_100k.pkl",
     "test_label_url": "data/testY_100k.npy",
@@ -8,13 +9,15 @@
     "down_sampling_ratio": null, 
     "validation_index": null, 
     "validation_ratio": 0.15,
+    
+    "debug_data": 0.05,
         
-    "gs_models": "lgb",
+    "gs_models": "xgb",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_search_rounds": 10,
-    "gs_cv": false,
+    "gs_search_rounds": 2,
+    "gs_cv": true,
     "gs_nfold": 5,
     "gs_verbose_eval": 1,
     "gs_do_preds": true,
