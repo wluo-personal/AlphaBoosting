@@ -1,27 +1,32 @@
 {
     "project_root": "./",
     "last_run_record_filename": "last_run_record.json",
+    "data_name": "ordinal",
     "train_data_url": "data/train_1M.pkl",
     "test_data_url": "data/testX_100k.pkl",
+    "test_label_url": "data/testY_100k.npy",
     "down_sampling_amt": 0,
     "down_sampling_ratio": null, 
     "validation_index": null, 
-    "validation_ratio": 0.2,
+    "validation_ratio": 0.15,
+    
+    "debug_data": 0.05,
         
-    "gs_model": "lgb",
+    "gs_models": "xgb",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_search_rounds": 1,
+    "gs_search_rounds": 2,
     "gs_cv": true,
     "gs_nfold": 5,
-    "gs_verbose_eval": 20,
+    "gs_verbose_eval": 1,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
     "oof_nfolds": 5,
-    "top_n_gs": 3,
+    "top_n_gs": 8,
     "report_metric": "auc",
+    "layer1_thresh": 0.6,
     
     "_comments": {
         "validation": "validation_index overrules validation_ratio",
@@ -35,6 +40,6 @@
             "null or float in (0,1]",
             "Note: e.g. if 0.7, means chosen all pos samples plus 70% of negative samples. if null, then choose the all pos samples plus same amount of neg samples. (assume more neg samples then pos samples.)"
         ],
-        "gs_model": "lgb, nn, (or all). grid search models"
+        "gs_model": "lgb, nn, lgb|nn. grid search models"
     }
 }

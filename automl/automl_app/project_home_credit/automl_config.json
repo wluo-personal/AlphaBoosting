@@ -1,0 +1,47 @@
+{
+    "project_root": "./",
+    "last_run_record_filename": "last_run_record.json",
+    "data_name": "bo2",
+    "train_data_url": "data/train_bo2.pkl",
+    "test_data_url": "data/test_bo2.pkl",
+    "test_label_url": null,
+    "down_sampling_amt": 0,
+    "down_sampling_ratio": null, 
+    "validation_index": null, 
+    "validation_ratio": 0.15,
+    
+    "debug_data": 0.1,
+        
+    "gs_models": "lgb",
+    "categorical_features": ["FLAG_OWN_CAR","FLAG_OWN_REALTY","NAME_TYPE_SUITE","NAME_INCOME_TYPE","NAME_EDUCATION_TYPE","NAME_FAMILY_STATUS","NAME_HOUSING_TYPE", "OCCUPATION_TYPE","FLAG_DOCUMENT_2","FLAG_DOCUMENT_3","FLAG_DOCUMENT_4","FLAG_DOCUMENT_5","FLAG_DOCUMENT_6","FLAG_DOCUMENT_7","FLAG_DOCUMENT_8","FLAG_DOCUMENT_9","FLAG_DOCUMENT_10","FLAG_DOCUMENT_11","FLAG_DOCUMENT_12", "FLAG_DOCUMENT_13","FLAG_DOCUMENT_14","FLAG_DOCUMENT_15","FLAG_DOCUMENT_16","FLAG_DOCUMENT_17","FLAG_DOCUMENT_18", "FLAG_DOCUMENT_19","FLAG_DOCUMENT_20","FLAG_DOCUMENT_21", "NAME_TYPE_SUITE", "CAT_MONTHS_BIRTH"],
+    "not_features": ["ORGANIZATION_TYPE","SK_ID_CURR"],
+    "label": "TARGET",
+    "gs_search_rounds": 2,
+    "gs_cv": true,
+    "gs_nfold": 5,
+    "gs_verbose_eval": 200,
+    "gs_do_preds": false,
+    "gs_suppress_warning": true,
+        
+    "oof_nfolds": 5,
+    "top_n_gs": 8,
+    "report_metric": "auc",
+    "layer1_thresh": 0.797,
+    
+    "_comments": {
+        "validation": "validation_index overrules validation_ratio",
+        "validation_ratio" : "range(exclusive): (0,1)",
+        "down_sampling_amt": [
+            "integer. 0: no downsampling. >0, the amount of downsamplings",
+            "Note 1: combine the same positive samples with different negative samples will result in a different downsampling (assume more neg samples then pos samples",
+            "Note 2: when set to 0, 'down_sampling_ratio' has no effect"
+        ],
+        "down_sampling_ratio": [
+            "null or float in (0,1]",
+            "Note: e.g. if 0.7, means chosen all pos samples plus 70% of negative samples. if null, then choose the all pos samples plus same amount of neg samples. (assume more neg samples then pos samples.)"
+        ],
+        "gs_model": "lgb, nn, lgb|nn. grid search models",
+        "top_n_gs": "number of gs params will be chosen to generate stacknet layer1 models",
+        "layer1_thresh": "threshold(based on gs_val_auc) to choosen from layer1 models to construct layer2 models"
+    }
+}

@@ -1,6 +1,9 @@
 import numpy as np
+import random
+import string
 import logging
 module_logger = logging.getLogger(__name__)
+
 
 def set_type(series, dtype):
     """Returns datatype with appropriate data size.
@@ -28,6 +31,7 @@ def set_type(series, dtype):
         if max(abs(_min), _max) <= 3.4028235e+38: return np.float32
         else: return np.float64
 
+
 def save(df=None, flg='both', train_len=0, url='./', name='default'):
     """
     flg: str. options: both/train/test
@@ -45,6 +49,7 @@ def save(df=None, flg='both', train_len=0, url='./', name='default'):
         #module_logger.debug('{} saved at {}'.format(filename, url))
     else:
         raise ValueError('flg options: both/train/test')
+
 
 def get_time(timezone='America/New_York', time_format='%Y-%m-%d %H:%M:%S'):
     from datetime import datetime
@@ -64,3 +69,7 @@ def get_time(timezone='America/New_York', time_format='%Y-%m-%d %H:%M:%S'):
     est = utc.astimezone(to_zone)
 
     return est.strftime(time_format)
+
+
+def get_random_string(length=4):
+    return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))

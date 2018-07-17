@@ -1,6 +1,7 @@
 from automl_libs import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
 from automl_libs import SklearnBLE, LightgbmBLE, NNBLE
 from automl_libs import compute_layer1_oof, compute_layer2_oof
+from automl_libs import utils
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import roc_auc_score
@@ -8,11 +9,12 @@ import pandas as pd
 from os import listdir
 import pdb
 import time
+import ast
 import logging, gc
 module_logger = logging.getLogger(__name__)
 
 
-def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
+def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, top_n_gs,
            oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     Params:
@@ -24,12 +26,12 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
             e.g. ['label'] or ['label1', 'label2']
         top_n_gs: int. choose top N from grid search results of each model
     """
-    X_train_ordinal = train[feature_cols]  # still df
+    X_train = train[feature_cols]  # still df
     y_train = train[label_cols]  # make sure it's df
-    X_test_ordinal = test[feature_cols] # still df
+    X_test = test[feature_cols] # still df
 
     bldr = BaseLayerDataRepo()
-    bldr.add_data('flight_data_ordinal', X_train_ordinal, X_test_ordinal, y_train, label_cols,
+    bldr.add_data(data_name, X_train, X_test, y_train, label_cols,
                   [ModelName.LGB.name, ModelName.NN.name])
     # bldr.add_data('flight_data_one_hot', X_train_one_hot, X_test_one_hot, y_train, label_cols,
     #               [ModelName.LOGREG, ModelName.XGB])
@@ -41,7 +43,8 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
     for filename in listdir(gs_result_path):
         if '_grid_search' in filename:
             model_type = filename.split('_')[0]  # LGB, NN, etc...
-            gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0').sort_values(by=['val_auc'], ascending=False)
+            gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
+                .sort_values(by=['val_auc'], ascending=False)
             gs_res_dict = gs_res.T.to_dict()
             chosen_res_dict = gs_res.head(top_n_gs).T.to_dict()
 
@@ -54,16 +57,24 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
             if load_from_file:
                 # remove already processed gs results
                 for model_data in base_layer_results_repo.get_model_data_id_list():
-                    result_index = int(model_data.split('__')[0])
+                    result_index = model_data.split('__')[0]
                     if chosen_res_dict.pop(result_index, None) is not None:
-                        module_logger.debug('{} already processed in StackNet, so removed it from chosen_gs_results'.format(result_index))
+                        module_logger.info('{} already processed in StackNet, so removed it from chosen_gs_results'.format(result_index))
 
-            model_pool = {}
+            # model_pool = {}  # move this inside the for loop so that saving is performed per model
             if len(chosen_res_dict) > 0:
                 for k, v in chosen_res_dict.items():
+                    model_pool = {}  # since it's now inside the loop, it will only contain one model each iteration
                     params = v
-                    module_logger.debug('using {} params: {} to do oof'.format(model_type, k))
+                    module_logger.info('using {} params: {} to do oof'.format(model_type, k))
                     module_logger.debug(params)
+
+                    # [50, 20] is converted to "[50, 20]" after saved in csv
+                    # so convert them back to [50, 20]
+                    if 'int_list' in params:
+                        for int_list_name in ast.literal_eval(ast.literal_eval(params['int_list'])):
+                            params[int_list_name] = ast.literal_eval(ast.literal_eval(params[int_list_name]))
+
                     params['categorical_feature'] = categorical_cols
                     if model_type == 'lgb':
                         params['verbose_eval'] = int(params['best_round'] / 5)
@@ -74,33 +85,34 @@ def layer1(train, test, categorical_cols, feature_cols, label_cols, top_n_gs,
                         base_layer_estimator = NNBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.NN.name] = base_layer_estimator
 
-                layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, model_data_id_list = \
-                    compute_layer1_oof(bldr, model_pool, label_cols, nfolds=oof_nfolds,
-                                       sfm_threshold=None, metrics_callback=metrics_callback)
+                    # the following was outside the for loop, now they are inside
+                    # so that we can save after each model is done. (because a model
+                    # might need hours of finish computing oof, we want to save it
+                    # once it's done)
+                    layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, model_data_id_list = \
+                        compute_layer1_oof(bldr, model_pool, label_cols, nfolds=oof_nfolds,
+                                           sfm_threshold=None, metrics_callback=metrics_callback)
 
-                # for debug purpose, read in testY  ########################################
-                import numpy as np
-                testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-                for k, v in layer1_est_preds.items():
-                    module_logger.warning('DEBUG: roc of test {}: {}'.format(k, roc_auc_score(testY, v)))
-                # for debug purpose, read in testY  ########################################
+                    base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds,
+                                                layer1_cv_score, model_data_id_list)
 
-                base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds,
-                                            layer1_cv_score, model_data_id_list)
+                    # the following add/update scores to model_data in the repo, so it
+                    # needs to be done after the [add] function, which stores
+                    # model_data into the repo.
+                    for model_data in model_data_id_list:
+                        result_index = model_data.split('__')[0]
+                        val_score = gs_res_dict[result_index]['val_'+metric]
+                        base_layer_results_repo.add_score(model_data, val_score)
+                        base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
 
-                # the following add/update scores to model_data in the repo, so it
-                # needs to be done after the [add] function, which stores
-                # model_data into the repo.
-                for model_data in model_data_id_list:
-                    result_index = int(model_data.split('__')[0])
-                    val_score = gs_res_dict[result_index]['val_'+metric]
-                    base_layer_results_repo.add_score(model_data, val_score)
-                    base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
+                    if y_test is not None:
+                        for k, v in layer1_est_preds.items():
+                            base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
 
-                base_layer_results_repo.save()
+                    base_layer_results_repo.save()
 
 
-def layer2(train, label_cols, oof_path, metric, save_report):
+def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thresh, save_report):
     """
     Params:
         train: DataFrame with label
@@ -116,26 +128,31 @@ def layer2(train, label_cols, oof_path, metric, save_report):
     layer2_inputs = {}
     layer2_chosen_model_data = {}
 
-    model_id = str(int(time.time()))
+    model_id = utils.get_random_string()
     model_name = model_id+'__'+ModelName.LOGREG.name
     model_pool[model_name] = SklearnBLE(LogisticRegression)
     chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-        base_layer_results_repo.get_results(layer='layer1', threshold=0.70)
+        base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=layer1_thresh)
     layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-    layer2_chosen_model_data[model_id] = '|'.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+    layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
-    time.sleep(1.5)  # make sure int(time.time()) returns different value
+    # model_id = utils.get_random_string()
+    # nn_model_param, _ = params_gen('stacknet_layer2_nn')
+    # model_name = model_id+'__'+ModelName.NN.name
+    # model_pool[model_name] = NNBLE(params=nn_model_param)
+    # chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
+    #     base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=layer1_thresh)
+    # layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
+    # layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
-    model_id = str(int(time.time()))
-    model_name = model_id+'__'+ModelName.LOGREG.name
-    model_pool[model_name] = SklearnBLE(DecisionTreeClassifier)
-    chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-        base_layer_results_repo.get_results(layer='layer1', threshold=0.713)
-    layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-    layer2_chosen_model_data[model_id] = '\n'.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+    # decision tree: bad performance
+    # ...
+    # model_pool[model_name] = SklearnBLE(DecisionTreeClassifier)
+    # ...
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 5, 2018, metric=metric, metrics_callback=metrics_callback)
+        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols,
+                           5, 2018, metric=metric, metrics_callback=metrics_callback)
 
     base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
                                 layer2_cv_score, layer2_model_data_list)
@@ -144,19 +161,18 @@ def layer2(train, label_cols, oof_path, metric, save_report):
         model_id = model_data.split('__')[0]
         base_layer_results_repo.add_score(model_data, layer2_cv_score[model_data])
         base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2_chosen_model_data[model_id])
+
+    if y_test is not None:
+        for k, v in layer2_est_preds.items():
+            base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
+
     base_layer_results_repo.save()
 
-    if save_report:
-        stacknet_report = base_layer_results_repo.get_report()
-        stacknet_report_file = oof_path + 'stacknet_report.csv'
-        stacknet_report.to_csv(stacknet_report_file, index=False)
-        module_logger.info('StackNet Report saved at {}'.format(stacknet_report_file))
-
-    # for debug purpose, read in testY  # TODO, remove after development
-    import numpy as np
-    testY = np.load('/home/kai/data/shiyi/data/flight_data/testY_100k.npy')
-    for k, v in layer2_est_preds.items():
-        print('roc of test', k, roc_auc_score(testY, v))
+    # if save_report:
+    #     stacknet_report = base_layer_results_repo.get_report()
+    #     stacknet_report_file = oof_path + 'stacknet_report.csv'
+    #     stacknet_report.to_csv(stacknet_report_file, index=False)
+    #     module_logger.info('StackNet Report saved at {}'.format(stacknet_report_file))
 
 
 def _get_metrics_callback(metric):

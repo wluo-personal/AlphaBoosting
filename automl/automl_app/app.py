@@ -17,8 +17,9 @@ class AlphaBoosting:
         GRID_SEARCH = 6
         STACKNET = 7
 
-    def __init__(self, config_file, features_to_gen, gs_params_gen):
+    def __init__(self, config_file, features_to_gen, params_gen):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
+        self.logger.info('='*10+'START'+'='*10)
 
         if config_file is None:
             raise Exception('config file can not be None')
@@ -32,7 +33,7 @@ class AlphaBoosting:
         # 2. don't create this file or modify this file
             
         self.features_to_gen = features_to_gen
-        self.gs_params_gen = gs_params_gen
+        self.params_gen = params_gen
 
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
@@ -254,19 +255,17 @@ class AlphaBoosting:
                                       file_name_body=file_name_body)
             self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_GEN.name, self.OUTDIR + 'todo_list.json')
 
-
-
     def _grid_search(self, to_do_dict):
         stage = self.Stage.GRID_SEARCH.name
         if not to_do_dict[stage]:
-            train, val, test, categorical_features, feature_cols, label_col = self._get_final_data()
+            data_name, train, val, test, y_test, categorical_features, feature_cols, label_col = self._get_final_data()
             X_train = train[feature_cols]
             y_train = train[label_col]
             X_val = val[feature_cols]
             y_val = val[label_col]
             X_test = test[feature_cols]
 
-            gs_model = self.config_dict['gs_model']
+            gs_models = self.config_dict['gs_models']
             gs_record_dir = self.OUTDIR
             gs_search_rounds = self.config_dict['gs_search_rounds']
             gs_cv = self.config_dict['gs_cv']
@@ -275,12 +274,12 @@ class AlphaBoosting:
             gs_do_preds = self.config_dict['gs_do_preds']
             gs_sup_warning = self.config_dict['gs_suppress_warning']
 
-            grid_search.gs(X_train, y_train, X_val, y_val,
+            grid_search.gs(data_name, X_train, y_train, X_val, y_val,
                            categorical_features, search_rounds=gs_search_rounds,
                            gs_record_dir=gs_record_dir,
-                           gs_params_gen=self.gs_params_gen, gs_model=gs_model,
+                           gs_params_gen=self.params_gen, gs_models=gs_models,
                            cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
-                           do_preds=gs_do_preds, X_test=X_test,
+                           do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
                            preds_save_path=self.OUTDIR+'gs_saved_preds/',
                            suppress_warning=gs_sup_warning)
             del train, val, test; gc.collect()
@@ -293,17 +292,18 @@ class AlphaBoosting:
             if not os.path.exists(oof_path):
                 os.makedirs(oof_path)
             gs_result_path = self.OUTDIR
-            train, val, test, categorical_features, feature_cols, label_cols = self._get_final_data()
+            data_name, train, val, test, y_test, categorical_features, feature_cols, label_cols = self._get_final_data()
             # convert label_cols to list so that y_train will be a dataframe, which is required stacknet layers
             if not isinstance(label_cols, list):
                 label_cols = [label_cols]
             train = pd.concat([train, val])
-            stacknet.layer1(train, test, categorical_features, feature_cols, label_cols,
+            stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
                             top_n_gs=self.config_dict['top_n_gs'],
                             oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
                             metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
-            stacknet.layer2(train, label_cols, oof_path, metric=self.config_dict['report_metric'],
-                            save_report=True)
+            stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
+                            oof_path=oof_path, metric=self.config_dict['report_metric'],
+                            layer1_thresh=self.config_dict['layer1_thresh'], save_report=True)
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
 
@@ -314,16 +314,32 @@ class AlphaBoosting:
             train = pd.read_pickle(self.TEMP_DATADIR+'0.pkl')
         val = pd.read_pickle(self.TEMP_DATADIR+'val.pkl')
         test = pd.read_pickle(self.TEMP_DATADIR+'test.pkl')
+        y_test_url = self.config_dict['test_label_url']
+        y_test = None
+        if y_test_url is not None:
+            y_test = np.load(y_test_url)  # could be none
+            assert len(test) == len(y_test)
 
         not_features = self.config_dict['not_features']
         categorical_features = list(set(self.config_dict['categorical_features']) - set(not_features))
         label_col = self.config_dict['label']
         label_col_as_list=[label_col]
         feature_cols = list(set(train.columns) - set(not_features) - set(label_col_as_list))
-        train = train.head(500000)
-        # TODO:
-        # remove .head(X)
-        return train, val, test, categorical_features, feature_cols, label_col
+        debug_data = self.config_dict['debug_data']
+        if 0 < debug_data < 1:
+            train = train.head(int(debug_data*len(train)))
+            val = val.head(int(debug_data*len(val)))
+            self.logger.info('DEBUG mode is on, {}% of train,val data are chosen'.format(debug_data*100))
+        elif debug_data > 1:
+            train = train.head(debug_data)
+            val = val.head(debug_data)
+            self.logger.info('DEBUG mode is on, first {} rows of train,val data are chosen'.format(debug_data))
+        data_name = self.config_dict['data_name']
+        self.logger.info('Data <{}> retrieved. Shape: train {} | val {} | test {} | contain test label: {} | '
+                         '{} cat features | {} total features | y name: {}'
+                         .format(data_name, train.shape, val.shape, test.shape, False if y_test is None else True,
+                                 len(categorical_features), len(feature_cols), label_col))
+        return data_name, train, val, test, y_test, categorical_features, feature_cols, label_col
 
         
     # support functions
@@ -355,7 +371,7 @@ class AlphaBoosting:
         generated_feature_name = '__'.join([func.__name__, '_'.join(feature_cols)])
         if feature_to_gen.get('params') != {}: generated_feature_name += '__' + '_'.join(map(str, params.values()))
         params['train_len'] = self.train_len
-        if not os.path.exists(self.FEATUREDIR + generated_feature_name + '.pkl'):
+        if not os.path.exists(self.FEATUREDIR + 'train__' + generated_feature_name + '.pkl'):
             # TODO: test if passing df=df[feature_cols+[self.label]] can save memory
             _df = func(df=self.df, cols=feature_to_gen.get('feature_cols'), dummy_col=self.label,
                        generated_feature_name=generated_feature_name, params=params)
