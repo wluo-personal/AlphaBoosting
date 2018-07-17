@@ -1,0 +1,1 @@
+{"root": "./", "train_csv_url": null, "test_csv_url": null, "timestamp": null, "label": null, "categorical_features": null, "numerical_features": null, "validation_index": [], "downsampling": 1}
