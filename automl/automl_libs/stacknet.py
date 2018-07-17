@@ -1,5 +1,5 @@
 from automl_libs import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
-from automl_libs import SklearnBLE, LightgbmBLE, NNBLE
+from automl_libs import SklearnBLE, LightgbmBLE, NNBLE, XgboostBLE
 from automl_libs import compute_layer1_oof, compute_layer2_oof
 from automl_libs import utils
 from sklearn.linear_model import LogisticRegression
@@ -17,24 +17,28 @@ module_logger = logging.getLogger(__name__)
 def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, top_n_gs,
            oof_nfolds, oof_path, metric, gs_result_path=''):
     """
-    Params:
-        train: DataFrame with label
-        test: DataFrame without label
-        categorical_cols: list of column names
-        feature_cols: list of column names
-        label_cols: list of column names (multi-classes or single-class) (required by BaseLayerDataRepo)
-            e.g. ['label'] or ['label1', 'label2']
-        top_n_gs: int. choose top N from grid search results of each model
+    :param data_name: data name. e.g. 'ordinal', 'one_hot', etc
+    :param train: DataFrame with label
+    :param test: DataFrame without label
+    :param y_test: array-like. In Kaggle, we don't know it.
+    :param categorical_cols: list of column names
+    :param feature_cols: list of column names
+    :param label_cols: list of column names (multi-classes or single-class) (required by BaseLayerDataRepo)
+                e.g. ['label'] or ['label1', 'label2']
+    :param top_n_gs: int. choose top N from EACH grid search results (combination of model and data)
+    :param oof_nfolds: nfolds in oof
+    :param oof_path: path to save and load oof
+    :param metric: usually 'auc' for binary classification
+    :param gs_result_path: path to load grid search result
+    :return: None
     """
     X_train = train[feature_cols]  # still df
     y_train = train[label_cols]  # make sure it's df
     X_test = test[feature_cols] # still df
 
     bldr = BaseLayerDataRepo()
-    bldr.add_data(data_name, X_train, X_test, y_train, label_cols,
-                  [ModelName.LGB.name, ModelName.NN.name])
-    # bldr.add_data('flight_data_one_hot', X_train_one_hot, X_test_one_hot, y_train, label_cols,
-    #               [ModelName.LOGREG, ModelName.XGB])
+    # leave the compatible model list empty
+    bldr.add_data(data_name, X_train, X_test, y_train, label_cols, [])
     module_logger.debug(bldr)
 
     metrics_callback = _get_metrics_callback(metric)
@@ -59,7 +63,8 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                 for model_data in base_layer_results_repo.get_model_data_id_list():
                     result_index = model_data.split('__')[0]
                     if chosen_res_dict.pop(result_index, None) is not None:
-                        module_logger.info('{} already processed in StackNet, so removed it from chosen_gs_results'.format(result_index))
+                        module_logger.info('{} already processed in StackNet, so removed it from chosen_gs_results'
+                                           .format(result_index))
 
             # model_pool = {}  # move this inside the for loop so that saving is performed per model
             if len(chosen_res_dict) > 0:
@@ -80,10 +85,17 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                         params['verbose_eval'] = int(params['best_round'] / 5)
                         base_layer_estimator = LightgbmBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.LGB.name] = base_layer_estimator
+                        bldr.add_compatible_model(data_name, ModelName.LGB.name)
+                    elif model_type == 'xgb':
+                        params['verbose_eval'] = int(params['best_round'] / 5)
+                        base_layer_estimator = XgboostBLE(params=params)
+                        model_pool[str(k)+'__'+ModelName.XGB.name] = base_layer_estimator
+                        bldr.add_compatible_model(data_name, ModelName.XGB.name)
                     elif model_type == 'nn':
                         params['verbose_eval'] = 1
                         base_layer_estimator = NNBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.NN.name] = base_layer_estimator
+                        bldr.add_compatible_model(data_name, ModelName.NN.name)
 
                     # the following was outside the for loop, now they are inside
                     # so that we can save after each model is done. (because a model
@@ -112,38 +124,51 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                     base_layer_results_repo.save()
 
 
-def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thresh, save_report):
+def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thresh_or_chosen, layer2_models):
     """
-    Params:
-        train: DataFrame with label
-        label_cols: list of column names (multi-classes or single-class)
-            e.g. ['label'] or ['label1', 'label2']
-
+    :param train: DataFrame with label
+    :param y_test: array-like. In Kaggle, we don't know it.
+    :param label_cols: list of column names (multi-classes or single-class)
+                e.g. ['label'] or ['label1', 'label2']
+    :param params_gen: needed for models like: NN
+    :param oof_path: path of save and load oof
+    :param metric: usually 'auc'.
+    :param layer1_thresh_or_chosen: either float (0,1) as threshold, or list of chosen model_data
+    :param layer2_models: currently support models: logreg, nn
+    :return: None
     """
     metrics_callback = _get_metrics_callback(metric)
     base_layer_results_repo = BaseLayerResultsRepo(label_cols=label_cols, filepath=oof_path, load_from_file=True)
-    module_logger.info('All available layer1 model_data:')
+    module_logger.info('All available model_data:')
     module_logger.info(base_layer_results_repo.show_scores())
     model_pool = {}
     layer2_inputs = {}
     layer2_chosen_model_data = {}
 
-    model_id = utils.get_random_string()
-    model_name = model_id+'__'+ModelName.LOGREG.name
-    model_pool[model_name] = SklearnBLE(LogisticRegression)
-    chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-        base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=layer1_thresh)
-    layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-    layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+    if isinstance(layer1_thresh_or_chosen, float) and 0 < layer1_thresh_or_chosen < 1:
+        chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
+            base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=layer1_thresh_or_chosen)
+    elif isinstance(layer1_thresh_or_chosen, list):
+        chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
+            base_layer_results_repo.get_results(chosen_ones=layer1_thresh_or_chosen)
+    else:
+        raise ValueError('layer1_thresh_or_chosen has unacceptable type {}. please pass in a float(0,1) or a list'
+                         .format(type(layer1_thresh_or_chosen)))
 
-    # model_id = utils.get_random_string()
-    # nn_model_param, _ = params_gen('stacknet_layer2_nn')
-    # model_name = model_id+'__'+ModelName.NN.name
-    # model_pool[model_name] = NNBLE(params=nn_model_param)
-    # chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
-    #     base_layer_results_repo.get_results(chosen_from_layer='layer1', threshold=layer1_thresh)
-    # layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-    # layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+    for layer2_model in layer2_models:
+        if layer2_model == 'logreg':
+            model_id = utils.get_random_string()
+            model_name = model_id+'__'+ModelName.LOGREG.name
+            model_pool[model_name] = SklearnBLE(LogisticRegression)
+        elif layer2_model == 'nn':
+            model_id = utils.get_random_string()
+            nn_model_param, _ = params_gen('stacknet_layer2_nn')
+            model_name = model_id+'__'+ModelName.NN.name
+            model_pool[model_name] = NNBLE(params=nn_model_param)
+        else:
+            raise ValueError('{} is not supported in layer2'.format(layer2_model))
+        layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
+        layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
     # decision tree: bad performance
     # ...

@@ -13,6 +13,7 @@ from keras.layers import Dense, Embedding, Input, LSTM, GRU, Bidirectional, \
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.models import Model
 import lightgbm as lgb
+import xgboost as xgb
 from automl_libs import nn_libs
 import logging
 module_logger = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ class SklearnBLE(BaseLayerEstimator):
 
 class LightgbmBLE(BaseLayerEstimator):
     def __init__(self, params={}, nb=False, seed=0):
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self._nb = nb
         self._seed = seed
         self._categorical_feature = params.pop('categorical_feature', 'auto')
@@ -148,16 +150,17 @@ class LightgbmBLE(BaseLayerEstimator):
         lgb_train = lgb.Dataset(x, y, categorical_feature=self._categorical_feature)
         if valid_set_percent != 0:
             if valid_set_percent == 1:
-                print('Evaluating using training set')
+                self.logger.debug('Evaluating using training set')
                 self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_train,
                                         num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
             else:
                 lgb_val = lgb.Dataset(x_val, y_val, categorical_feature=self._categorical_feature)
-                print('Evaluating using validation set ({}% of training set)'.format(valid_set_percent * 100))
+                self.logger.debug('Evaluating using validation set ({}% of training set)'.format(valid_set_percent * 100))
                 self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_val,
                                         num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
         else:
-            print('No evaluation set, thus not possible to use early stopping. Please train with your best params.')
+            self.logger.info('No evaluation set, thus not possible to use early stopping. '
+                             'Please train with your best params.')
             self._model = lgb.train(self._train_params, train_set=lgb_train, valid_sets=lgb_train,
                                     num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
 
@@ -165,7 +168,7 @@ class LightgbmBLE(BaseLayerEstimator):
         if self._nb:
             x = x.multiply(self._r)
         if self._model.best_iteration > 0:
-            print('best_iteration {} is chosen.'.format(self._model.best_iteration))
+            self.logger.info('best_iteration {} is chosen.'.format(self._model.best_iteration))
             result = self._model.predict(x, num_iteration=self._model.best_iteration)
         else:
             result = self._model.predict(x)
@@ -184,6 +187,40 @@ class LightgbmBLE(BaseLayerEstimator):
         if self._r is None:
             raise NotFittedError('_r is not calculated. check if nb is set to true')
         return self._r
+
+
+class XgboostBLE(BaseLayerEstimator):
+    def __init__(self, params={}, seed=0):
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._seed = seed
+        self._num_boost_round = params.pop('best_round', 100)
+        self._verbose_eval = params.pop('verbose_eval', 1)
+        self._train_params = params
+        self._model = None
+
+    def train(self, x, y):
+        """
+        Params:
+            x: np/scipy/ 2-d array or matrix
+            y: pandas series
+        """
+        xgb_train = xgb.DMatrix(x, y)
+        self.logger.info('No evaluation set, thus not possible to use early stopping. '
+                         'Please train with your best params.')
+        self._model = xgb.train(self._train_params, xgb_train, evals=[(xgb_train, 'train')],
+                                num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
+
+    def predict(self, x):
+        xgb_test = xgb.DMatrix(x)
+        result = self._model.predict(xgb_test)
+        return result
+
+    @property
+    def model_(self):
+        """Get the number of features of fitted model."""
+        if self._model is None:
+            raise NotFittedError('No model found. Need to call train beforehand.')
+        return self._model
 
 
 class NNBLE(BaseLayerEstimator):

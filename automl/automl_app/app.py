@@ -136,7 +136,7 @@ class AlphaBoosting:
     def _read_data(self):
         self.train = pd.read_pickle(self.train_data_url)
         self.test = pd.read_pickle(self.test_data_url)
-        self.df = pd.concat([self.train, self.test], ignore_index=True)
+        self.df = pd.concat([self.train, self.test], sort=True, ignore_index=True)
         self.train_len = self.train.shape[0]
 
     @staticmethod
@@ -297,13 +297,18 @@ class AlphaBoosting:
             if not isinstance(label_cols, list):
                 label_cols = [label_cols]
             train = pd.concat([train, val])
-            stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
-                            top_n_gs=self.config_dict['top_n_gs'],
-                            oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
-                            metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
-            stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
-                            oof_path=oof_path, metric=self.config_dict['report_metric'],
-                            layer1_thresh=self.config_dict['layer1_thresh'], save_report=True)
+            layers_to_built = self.config_dict['build_stacknet_layers']
+            self.logger.info('layers to be built: {}'.format(layers_to_built))
+            if 1 in layers_to_built:
+                stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
+                                top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1'],
+                                oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
+                                metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
+            if 2 in layers_to_built:
+                stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
+                                oof_path=oof_path, metric=self.config_dict['report_metric'],
+                                layer1_thresh_or_chosen=self.config_dict['layer1_thresh_or_chosen_for_layer2'],
+                                layer2_models=self.config_dict['layer2_models'])
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
 

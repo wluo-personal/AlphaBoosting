@@ -342,18 +342,19 @@ class BaseLayerResultsRepo:
                     if value < threshold or chosen_from_layer not in key:
                         # e.g. 'layer1' not in '1530415817__LogisticRegression_layer2'
                         self.remove(key)
-            else: # chosen_ones is not None
+            else:  # chosen_ones is not None
                 assert type(chosen_ones) == list
                 for model_data_id in model_data_id_list_temp:
                     if model_data_id not in chosen_ones:
                         self.remove(model_data_id)
                 
-            self._save_lock = False # not actually removed, so set it back to True
+            self._save_lock = False  # not actually removed, so set it back to True
 
             r1 = self._layer1_oof_train
             r2 = self._layer1_oof_test
             r3 = self._base_layer_est_preds
             r4 = self._model_data_id_list
+            self.logger.info('chosen for layer2: {}'.format(r4))
 
             self._layer1_oof_train = layer1_oof_train_temp
             self._layer1_oof_test = layer1_oof_test_temp
@@ -489,7 +490,7 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
     #     layer1_oof_train[label] = []
     #     layer1_oof_test[label] = []
         for model_name in model_pool.keys():
-            # model_name is 1530220352__LGB, so model_id will be LGB, not the number
+            # model_name is AwgE__LGB, so model_id will be LGB, not the number
             model_id = model_name.split('__')[1]
             for data in bldr.get_data_by_compatible_model(model_id):
 

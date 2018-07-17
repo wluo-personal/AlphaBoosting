@@ -59,7 +59,7 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                         #module_logger.debug(params[k])
 
                 res = pd.DataFrame(params, index=[run_id])
-                filename_for_gs_results = gs_record_dir + '{}_grid_search.csv'.format(gs_model)
+                filename_for_gs_results = gs_record_dir + '{}_{}_grid_search.csv'.format(gs_model, data_name)
                 if not os.path.exists(filename_for_gs_results):
                     res.to_csv(filename_for_gs_results)
                     module_logger.debug(filename_for_gs_results + ' created')
@@ -68,7 +68,6 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                     res = pd.concat([old_res, res])
                     res.to_csv(filename_for_gs_results)
                     module_logger.info(filename_for_gs_results + ' updated')
-                pdb.set_trace()
 
             except Exception as e:
                 if 'ResourceExhaustedError' in str(type(e)): # can't catch this error directly...
@@ -192,8 +191,8 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     if do_preds:
         predict_start_time = time.time()
         module_logger.info('[do_preds] is True, generating predictions ...')
-        module_logger.info('Retrain model using best_round and all data...')
         best_round = lgb_params['best_round']
+        module_logger.info('Retrain model using best_round [{}] and all data...'.format(best_round))
         lgb_all_data = lgb.Dataset(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]),
                                    categorical_feature=categorical_feature)
         model = lgb.train(lgb_params, lgb_all_data, valid_sets=lgb_all_data,
@@ -303,9 +302,6 @@ def _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     metric = xgb_params['eval_metric']
     run_id = utils.get_random_string()  # also works as the index of the result dataframe
 
-    # import pprint
-    # pp = pprint.PrettyPrinter(indent=4)
-    # pp.pprint(xgb_params)
     xgb_params['timestamp'] = utils.get_time()
     gs_start_time = time.time()
     if cv:
@@ -344,8 +340,8 @@ def _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     if do_preds:
         predict_start_time = time.time()
         module_logger.info('[do_preds] is True, generating predictions ...')
-        module_logger.info('Retrain model using best_round and all data...')
         best_round = xgb_params['best_round']
+        module_logger.info('Retrain model using best_round [{}] and all data...'.format(best_round))
         xgb_all_data = xgb.DMatrix(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]))
         xgb_test = xgb.DMatrix(X_test)
         evals_res = {}
