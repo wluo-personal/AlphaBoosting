@@ -23,7 +23,7 @@
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
-    "build_stacknet_layers": [1,2],
+    "build_stacknet_layers": [1],
     "oof_nfolds": 5,
     "top_n_per_gs_res_for_layer1": 8,
     "report_metric": "auc",

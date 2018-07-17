@@ -25,7 +25,7 @@
         
     "build_stacknet_layers": [1],
     "oof_nfolds": 5,
-    "top_n_per_gs_res_for_layer1": 1,
+    "top_n_per_gs_res_for_layer1": 3,
     "report_metric": "auc",
     "layer1_thresh_or_chosen_for_layer2": 0.6,
     "layer2_models": ["logreg", "nn"],

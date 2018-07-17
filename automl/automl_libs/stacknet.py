@@ -82,12 +82,12 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
 
                     params['categorical_feature'] = categorical_cols
                     if model_type == 'lgb':
-                        params['verbose_eval'] = int(params['best_round'] / 5)
+                        params['verbose_eval'] = int(params['best_round'] / 10)
                         base_layer_estimator = LightgbmBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.LGB.name] = base_layer_estimator
                         bldr.add_compatible_model(data_name, ModelName.LGB.name)
                     elif model_type == 'xgb':
-                        params['verbose_eval'] = int(params['best_round'] / 5)
+                        params['verbose_eval'] = int(params['best_round'] / 10)
                         base_layer_estimator = XgboostBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.XGB.name] = base_layer_estimator
                         bldr.add_compatible_model(data_name, ModelName.XGB.name)
