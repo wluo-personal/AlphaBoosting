@@ -13,7 +13,7 @@
     "debug_data": 0,
         
     "gs_models": "xgb",
-    "categorical_features": ["FLAG_OWN_CAR","FLAG_OWN_REALTY","NAME_TYPE_SUITE","NAME_INCOME_TYPE","NAME_EDUCATION_TYPE","NAME_FAMILY_STATUS","NAME_HOUSING_TYPE", "OCCUPATION_TYPE","FLAG_DOCUMENT_2","FLAG_DOCUMENT_3","FLAG_DOCUMENT_4","FLAG_DOCUMENT_5","FLAG_DOCUMENT_6","FLAG_DOCUMENT_7","FLAG_DOCUMENT_8","FLAG_DOCUMENT_9","FLAG_DOCUMENT_10","FLAG_DOCUMENT_11","FLAG_DOCUMENT_12", "FLAG_DOCUMENT_13","FLAG_DOCUMENT_14","FLAG_DOCUMENT_15","FLAG_DOCUMENT_16","FLAG_DOCUMENT_17","FLAG_DOCUMENT_18", "FLAG_DOCUMENT_19","FLAG_DOCUMENT_20","FLAG_DOCUMENT_21", "NAME_TYPE_SUITE", "CAT_MONTHS_BIRTH"],
+    "categorical_features": ["FLAG_OWN_CAR","FLAG_OWN_REALTY","NAME_TYPE_SUITE","NAME_INCOME_TYPE","NAME_EDUCATION_TYPE","NAME_FAMILY_STATUS","NAME_HOUSING_TYPE", "OCCUPATION_TYPE","FLAG_DOCUMENT_2","FLAG_DOCUMENT_3","FLAG_DOCUMENT_4","FLAG_DOCUMENT_5","FLAG_DOCUMENT_6","FLAG_DOCUMENT_7","FLAG_DOCUMENT_8","FLAG_DOCUMENT_9","FLAG_DOCUMENT_10","FLAG_DOCUMENT_11","FLAG_DOCUMENT_12", "FLAG_DOCUMENT_13","FLAG_DOCUMENT_14","FLAG_DOCUMENT_15","FLAG_DOCUMENT_16","FLAG_DOCUMENT_17","FLAG_DOCUMENT_18", "FLAG_DOCUMENT_19","FLAG_DOCUMENT_20","FLAG_DOCUMENT_21", "CAT_MONTHS_BIRTH"],
     "not_features": ["ORGANIZATION_TYPE","SK_ID_CURR"],
     "label": "TARGET",
     "gs_search_rounds": 50,
@@ -23,12 +23,12 @@
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
-    "build_stacknet_layers": [1],
+    "build_stacknet_layers": [2],
     "oof_nfolds": 5,
     "top_n_per_gs_res_for_layer1": 8,
     "report_metric": "auc",
-    "layer1_thresh_or_chosen_for_layer2": 0.797,
-    "layer2_models": ["logreg", "nn"],
+    "layer1_thresh_or_chosen_for_layer2": 0.7972,
+    "layer2_models": ["logreg","nn"],
     
     "_comments": {
         "validation": "validation_index overrules validation_ratio",
