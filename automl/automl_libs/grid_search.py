@@ -307,8 +307,9 @@ def _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     if cv:
         # use ALL data to do cv
         xgb_train = xgb.DMatrix(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]))
-        eval_hist = xgb.cv(xgb_params, xgb_train, nfold=nfold, early_stopping_rounds=esr,
-                           num_boost_round=nbr, verbose_eval=verbose_eval, seed=seed)
+        eval_hist = xgb.cv(xgb_params, xgb_train, nfold=nfold, stratified=True,
+                           early_stopping_rounds=esr, num_boost_round=nbr,
+                           verbose_eval=verbose_eval, seed=seed)
         del xgb_train; gc.collect()
         best_round = len(eval_hist['test-'+metric+'-mean'])
         xgb_params['best_round'] = best_round

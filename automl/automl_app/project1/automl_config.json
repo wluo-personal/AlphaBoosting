@@ -9,6 +9,8 @@
     "down_sampling_ratio": null, 
     "validation_index": null, 
     "validation_ratio": 0.15,
+    "validation_ratio_mode": "random",
+    "validation_ratio_stratify": true,
     
     "debug_data": 0.05,
         
