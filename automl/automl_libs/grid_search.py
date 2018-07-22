@@ -163,7 +163,7 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         # use ALL data to do cv
         lgb_train = lgb.Dataset(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]),
                                 categorical_feature=categorical_feature)
-        eval_hist = lgb.cv(lgb_params, lgb_train, nfold=nfold,
+        eval_hist = lgb.cv(lgb_params, lgb_train, nfold=nfold, stratified=False,
                            categorical_feature=categorical_feature, verbose_eval=verbose_eval, seed=seed)
         del lgb_train; gc.collect()
         best_round = len(eval_hist[metric + '-mean'])
