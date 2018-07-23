@@ -14,6 +14,7 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.models import Model
 import lightgbm as lgb
 import xgboost as xgb
+import catboost as catb
 from automl_libs import nn_libs
 import logging
 module_logger = logging.getLogger(__name__)
@@ -187,6 +188,39 @@ class LightgbmBLE(BaseLayerEstimator):
         if self._r is None:
             raise NotFittedError('_r is not calculated. check if nb is set to true')
         return self._r
+
+
+class CatBoostBLE(BaseLayerEstimator):
+    def __init__(self, params={}, seed=0):
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._categorical_feature = params.pop('categorical_feature', None)
+        self._verbose_eval = params.pop('verbose_eval', 1)
+        self._model = catb.CatBoostClassifier(**params)
+
+    def train(self, x, y):
+        """
+        Params:
+            x: np/scipy/ 2-d array or matrix
+            y: pandas series
+        """
+        categorical_features_indices = None
+        if self._categorical_feature is not None:
+            categorical_features_indices = [x.columns.tolist().index(col) for col in self._categorical_feature]
+        self.logger.info('No evaluation set, thus not possible to use early stopping. '
+                         'Please train with your best params.')
+        self._model.fit(x, y, eval_set=(x, y), verbose_eval=self._verbose_eval,
+                        cat_features=categorical_features_indices)
+
+    def predict(self, x):
+        result = self._model.predict_proba(x)[:, 1]
+        return result
+
+    @property
+    def model_(self):
+        """Get the number of features of fitted model."""
+        if self._model is None:
+            raise NotFittedError('No model found. Need to call train beforehand.')
+        return self._model
 
 
 class XgboostBLE(BaseLayerEstimator):

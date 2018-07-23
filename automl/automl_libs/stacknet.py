@@ -1,5 +1,5 @@
 from automl_libs import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
-from automl_libs import SklearnBLE, LightgbmBLE, NNBLE, XgboostBLE
+from automl_libs import SklearnBLE, LightgbmBLE, NNBLE, XgboostBLE, CatBoostBLE
 from automl_libs import compute_layer1_oof, compute_layer2_oof
 from automl_libs import utils
 from sklearn.linear_model import LogisticRegression
@@ -14,8 +14,8 @@ import logging, gc
 module_logger = logging.getLogger(__name__)
 
 
-def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, top_n_gs,
-           oof_nfolds, oof_path, metric, gs_result_path=''):
+def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, params_gen,
+           top_n_gs, top_n_by, oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     :param data_name: data name. e.g. 'ordinal', 'one_hot', etc
     :param train: DataFrame with label
@@ -47,8 +47,14 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
     for filename in listdir(gs_result_path):
         if '_grid_search' in filename:
             model_type = filename.split('_')[0]  # LGB, NN, etc...
-            gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
-                .sort_values(by=['val_auc'], ascending=False)
+            try:
+                # in grid search result of catboost, it's 'val_AUC',
+                # in all other models, it's 'val_auc'
+                gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
+                    .sort_values(by='val_'+top_n_by.lower(), ascending=False)
+            except KeyError:
+                gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0') \
+                    .sort_values(by='val_'+top_n_by.upper(), ascending=False)
             gs_res_dict = gs_res.T.to_dict()
             chosen_res_dict = gs_res.head(top_n_gs).T.to_dict()
 
@@ -91,6 +97,18 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                         base_layer_estimator = XgboostBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.XGB.name] = base_layer_estimator
                         bldr.add_compatible_model(data_name, ModelName.XGB.name)
+                    elif model_type == 'catb':
+                        original_params_example, _ = params_gen('catb')
+                        keys_in_original_params = original_params_example.keys()
+                        model_params = {}
+                        for key in keys_in_original_params:
+                            model_params[key] = params[key]
+                        print(model_params)
+                        model_params['categorical_feature'] = categorical_cols
+                        model_params['verbose_eval'] = int(params['iterations'] / 10)
+                        base_layer_estimator = CatBoostBLE(params=model_params)
+                        model_pool[str(k)+'__'+ModelName.CATB.name] = base_layer_estimator
+                        bldr.add_compatible_model(data_name, ModelName.CATB.name)
                     elif model_type == 'nn':
                         params['verbose_eval'] = 1
                         base_layer_estimator = NNBLE(params=params)
@@ -113,7 +131,12 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                     # model_data into the repo.
                     for model_data in model_data_id_list:
                         result_index = model_data.split('__')[0]
-                        val_score = gs_res_dict[result_index]['val_'+metric]
+                        try:
+                            # in grid search result of catboost, it's val_AUC,
+                            # in all others, it's val_auc
+                            val_score = gs_res_dict[result_index]['val_'+metric.lower()]
+                        except KeyError:
+                            val_score = gs_res_dict[result_index]['val_'+metric.upper()]
                         base_layer_results_repo.add_score(model_data, val_score)
                         base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
 

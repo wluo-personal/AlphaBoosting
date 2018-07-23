@@ -37,16 +37,16 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
             try:
                 if gs_model == 'logreg' or gs_model == 'svc':
                     params, run_id = _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
-                                     gs_params_gen, gs_model, cv, nfold, verbose_eval,
-                                     do_preds, X_test, y_test, preds_save_path)
+                                                    gs_params_gen, gs_model, cv, nfold, verbose_eval,
+                                                    do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'lgb':
                     params, run_id = _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
-                                     gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
-                                     do_preds, X_test, y_test, preds_save_path)
+                                             gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
+                                             do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'nn':
                     params, run_id = _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
-                                    gs_params_gen, gs_model, verbose_eval,
-                                    do_preds, X_test, y_test, preds_save_path)
+                                            gs_params_gen, gs_model, verbose_eval,
+                                            do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'xgb':
                     params, run_id = _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                              gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,

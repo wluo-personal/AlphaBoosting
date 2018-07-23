@@ -2,6 +2,7 @@
 *.log
 toxic/sc/stacking/obj/
 catboost_info/
+preprocess_and_analysis/
 *.csv
 val_index.json
 *.hdf5

@@ -21,14 +21,15 @@
     "gs_search_rounds": 2,
     "gs_cv": true,
     "gs_cv_stratified": false,
-    "gs_nfold": 10,
+    "gs_nfold": 4,
     "gs_verbose_eval": 5,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
-    "build_stacknet_layers": [2],
-    "oof_nfolds": 5,
+    "build_stacknet_layers": [1],
+    "oof_nfolds": 4,
     "top_n_per_gs_res_for_layer1": 3,
+    "top_n_by": "auc",
     "report_metric": "auc",
     "layer1_thresh_or_chosen_for_layer2": 0.6,
     "layer2_models": ["logreg", "nn"],
@@ -45,6 +46,9 @@
             "null or float in (0,1]",
             "Note: e.g. if 0.7, means chosen all pos samples plus 70% of negative samples. if null, then choose the all pos samples plus same amount of neg samples. (assume more neg samples then pos samples.)"
         ],
-        "gs_model": "lgb, nn, lgb|nn. grid search models"
+        "debug_data": "(0,1): only use this percentage of train and val data (test data not changed). int that > 1, use the first n rows",
+        "gs_model": "lgb, nn, lgb|nn. grid search models",
+        "top_n_gs": "number of gs params will be chosen to generate stacknet layer1 models",
+        "layer1_thresh": "threshold(based on gs_val_auc) to choosen from layer1 models to construct layer2 models"
     }
 }

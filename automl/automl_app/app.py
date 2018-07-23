@@ -186,12 +186,12 @@ class AlphaBoosting:
             
     # main functions
     def _generate_todo_list(self):
-        if os.path.exists(self.OUTDIR + 'todo_list.json'):
-            with open(self.OUTDIR + 'todo_list.json', 'r') as file:
+        if os.path.exists(self.TEMP_DATADIR + 'todo_list.json'):
+            with open(self.TEMP_DATADIR + 'todo_list.json', 'r') as file:
                 to_do_dict = json.load(file)
         else:
             to_do_dict = {s.name: False for s in self.Stage}
-            with open(self.OUTDIR + 'todo_list.json', 'w') as file:
+            with open(self.TEMP_DATADIR + 'todo_list.json', 'w') as file:
                 json.dump(to_do_dict, file, indent=4, sort_keys=True)
         return to_do_dict
     
@@ -200,7 +200,7 @@ class AlphaBoosting:
         if not to_do_dict[stage]:
             for feature_to_gen in self.features_to_gen:
                 self._add_column(feature_to_gen)
-        self._renew_status(to_do_dict, stage, (self.OUTDIR + 'todo_list.json'))
+        self._renew_status(to_do_dict, stage, (self.TEMP_DATADIR + 'todo_list.json'))
     
     def _validation_and_down_sampling(self, to_do_dict):
         split_folder = []
@@ -224,7 +224,7 @@ class AlphaBoosting:
                 os.makedirs(split_folder[-1])
                 
             self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_GEN_INDEX.name,
-                               self.OUTDIR + 'todo_list.json')
+                               self.TEMP_DATADIR + 'todo_list.json')
         
         # split files
         if not to_do_dict[self.Stage.VALIDATION_DOWNSAMPLING_SPLIT.name]:
@@ -239,7 +239,7 @@ class AlphaBoosting:
                                 tmp_df.loc[index[i]].reset_index(drop=True).to_pickle(split_folder[i] + file)
                                 del tmp_df
                                 gc.collect()
-            self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_SPLIT.name, self.OUTDIR + 'todo_list.json')
+            self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_SPLIT.name, self.TEMP_DATADIR + 'todo_list.json')
         
         # concat files
         if not to_do_dict[self.Stage.VALIDATION_DOWNSAMPLING_GEN.name]:
@@ -253,7 +253,7 @@ class AlphaBoosting:
                                       concat_folder=self.TEMP_DATADIR, 
                                       is_train=True, 
                                       file_name_body=file_name_body)
-            self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_GEN.name, self.OUTDIR + 'todo_list.json')
+            self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_GEN.name, self.TEMP_DATADIR + 'todo_list.json')
 
     def _grid_search(self, to_do_dict):
         stage = self.Stage.GRID_SEARCH.name
@@ -284,7 +284,7 @@ class AlphaBoosting:
                            preds_save_path=self.OUTDIR+'gs_saved_preds/',
                            suppress_warning=gs_sup_warning)
             del train, val, test; gc.collect()
-        self._renew_status(to_do_dict, stage, self.OUTDIR + 'todo_list.json')
+        self._renew_status(to_do_dict, stage, self.TEMP_DATADIR + 'todo_list.json')
 
     def _stacknet(self, to_do_dict):
         if not to_do_dict[self.Stage.STACKNET.name]:
@@ -302,6 +302,7 @@ class AlphaBoosting:
             self.logger.info('layers to be built: {}'.format(layers_to_built))
             if 1 in layers_to_built:
                 stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
+                                params_gen=self.params_gen, top_n_by=self.config_dict['top_n_by'],
                                 top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1'],
                                 oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
                                 metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
@@ -311,7 +312,7 @@ class AlphaBoosting:
                                 layer1_thresh_or_chosen=self.config_dict['layer1_thresh_or_chosen_for_layer2'],
                                 layer2_models=self.config_dict['layer2_models'])
 
-        # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.OUTDIR + 'todo_list.json')
+        # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.TEMP_DATADIR + 'todo_list.json')
 
     def _get_final_data(self):
         if self.down_sampling_amt == 0:
@@ -392,7 +393,7 @@ class AlphaBoosting:
                                   concat_folder=self.TEMP_DATADIR, 
                                   is_train=False, 
                                   file_name_body='test')
-            self._renew_status(to_do_dict, stage, self.OUTDIR + 'todo_list.json')
+            self._renew_status(to_do_dict, stage, self.TEMP_DATADIR + 'todo_list.json')
         gc.collect()
     
     def _generate_down_sampling_index_file(self, has_file_built):

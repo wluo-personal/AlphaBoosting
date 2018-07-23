@@ -35,6 +35,7 @@ class ModelName(Enum):
     NN = 20
     ONESVC = 21
     ONELOGREG = 22
+    CATB = 23
 
 
 class BaseLayerDataRepo():
