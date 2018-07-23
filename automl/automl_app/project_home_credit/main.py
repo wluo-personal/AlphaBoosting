@@ -91,12 +91,13 @@ def params_gen(model='lgb'):
         }
     elif model == 'catb':
         params = {
-            'iterations': 30,
-            'depth': np.random.randint(6, 11),
+            'iterations': 5000,
+            'depth': np.random.randint(4, 10),
             'l2_leaf_reg': np.random.randint(0, 31) / 10,
             #     'custom_metric': 'AUC',
             'eval_metric': 'AUC',
             'random_seed': seed,
+            # 'use_best_model': True,  # comment this if doing cv
             'logging_level': 'Verbose',
             'thread_count': 15
         }
