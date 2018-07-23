@@ -20,6 +20,7 @@
     "label": "TARGET",
     "gs_search_rounds": 100,
     "gs_cv": true,
+    "gs_cv_stratified": false,
     "gs_nfold": 10,
     "gs_verbose_eval": 100,
     "gs_do_preds": true,

@@ -14,18 +14,19 @@
     
     "debug_data": 0.05,
         
-    "gs_models": "xgb",
+    "gs_models": "catb",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
     "gs_search_rounds": 2,
     "gs_cv": true,
-    "gs_nfold": 5,
-    "gs_verbose_eval": 1,
+    "gs_cv_stratified": false,
+    "gs_nfold": 10,
+    "gs_verbose_eval": 5,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
-    "build_stacknet_layers": [1],
+    "build_stacknet_layers": [2],
     "oof_nfolds": 5,
     "top_n_per_gs_res_for_layer1": 3,
     "report_metric": "auc",

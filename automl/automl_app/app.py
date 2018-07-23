@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os, json, gc, logging, shutil, pickle, time
-from sklearn.model_selection import train_test_split
 from automl_libs import utils, grid_search, nn_libs, stacknet
 from enum import Enum
 import pdb
@@ -55,28 +54,9 @@ class AlphaBoosting:
                 val_ratio = self.config_dict['validation_ratio']
             except KeyError:
                 raise ValueError('since validation_index is null in config file, validation_ratio must be provided')
-            if val_ratio > 1 or val_ratio < 0:
-                raise ValueError('validation_ratio in config file is {}, not in (0,1)'.format(val_ratio))
             self.validation_ratio = val_ratio
-            if self.config_dict['validation_ratio_mode'] == 'last':
-                self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
-                self.logger.info('Last {}% is chosen as validation'.format(val_ratio*100))
-            elif self.config_dict['validation_ratio_mode'] == 'random':
-                X = self.train[self.train.columns[0]]  # just pick one column to be X
-                y = self.train[self.label]
-                if self.config_dict['validation_ratio_stratify']:
-                    X_train, X_validation, y_train, y_validation = \
-                        train_test_split(X, y, test_size=val_ratio, random_state=42, stratify=y)
-                else:
-                    X_train, X_validation, y_train, y_validation = \
-                        train_test_split(X, y, test_size=val_ratio, random_state=42)
-                self.validation_index = X_validation.index.tolist()
-                self.logger.info('Validation is randomly chosen. {}% | Stratify: {}'
-                                 .format(val_ratio*100, self.config_dict['validation_ratio_stratify']))
-                del X, y, X_train, X_validation, y_train, y_validation; gc.collect()
-            else:
-                raise ValueError('validation_ratio_mode {} in config file is not valid. (valid options: random, last)')
-
+            self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
+            
         downsampling_amount_changed = False
         down_sampling_ratio_changed = False
         val_index_changed = False
@@ -112,7 +92,7 @@ class AlphaBoosting:
         if not os.path.exists(self.TEMP_DATADIR): os.makedirs(self.TEMP_DATADIR)
         if not os.path.exists(self.FEATUREDIR): os.makedirs(self.FEATUREDIR)
             
-        # generate to-do list
+        # generate todo list: c
         self.logger.info('generate todo list')
         to_do_dict = self._generate_todo_list()
         
@@ -299,6 +279,7 @@ class AlphaBoosting:
                            gs_record_dir=gs_record_dir,
                            gs_params_gen=self.params_gen, gs_models=gs_models,
                            cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
+                           stratified=self.config_dict['gs_cv_stratified'],
                            do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
                            preds_save_path=self.OUTDIR+'gs_saved_preds/',
                            suppress_warning=gs_sup_warning)

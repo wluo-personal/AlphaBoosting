@@ -20,7 +20,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
-       gs_record_dir, gs_params_gen, gs_models, cv, nfold,
+       gs_record_dir, gs_params_gen, gs_models, cv, nfold, stratified,
        verbose_eval, do_preds, X_test, y_test, preds_save_path, suppress_warning, **kwargs):
 
     if suppress_warning:
@@ -41,7 +41,7 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                                      do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'lgb':
                     params, run_id = _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
-                                     gs_params_gen, gs_model, cv, nfold, verbose_eval,
+                                     gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
                                      do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'nn':
                     params, run_id = _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
@@ -49,8 +49,12 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                                     do_preds, X_test, y_test, preds_save_path)
                 elif gs_model == 'xgb':
                     params, run_id = _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
-                                             gs_params_gen, gs_model, cv, nfold, verbose_eval,
+                                             gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
                                              do_preds, X_test, y_test, preds_save_path)
+                elif gs_model == 'catb':
+                    params, run_id = _catb_gs(X_train, y_train, X_val, y_val, categorical_feature,
+                                              gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
+                                              do_preds, X_test, y_test, preds_save_path)
 
                 params['data_name'] = data_name
                 # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
@@ -149,7 +153,7 @@ def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
 
 def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
-            gs_params_gen, gs_model, cv, nfold, verbose_eval,
+            gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
             do_preds, X_test, y_test, preds_save_path):
     lgb_params, seed = gs_params_gen(gs_model)
     metric = lgb_params['metric']
@@ -164,7 +168,7 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         # use ALL data to do cv
         lgb_train = lgb.Dataset(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]),
                                 categorical_feature=categorical_feature)
-        eval_hist = lgb.cv(lgb_params, lgb_train, nfold=nfold, stratified=False,
+        eval_hist = lgb.cv(lgb_params, lgb_train, nfold=nfold, stratified=stratified,
                            categorical_feature=categorical_feature, verbose_eval=verbose_eval, seed=seed)
         del lgb_train; gc.collect()
         best_round = len(eval_hist[metric + '-mean'])
@@ -172,7 +176,6 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         cv_val_metric = eval_hist[metric + '-mean'][-1]
         lgb_params['val_' + metric] = cv_val_metric
         module_logger.info('val_{}: {:.5f} (cv, no train_{})'.format(metric, cv_val_metric, metric))
-        lgb_params['cv'] = True
     else:
         lgb_train = lgb.Dataset(X_train, y_train, categorical_feature=categorical_feature)
         lgb_val = lgb.Dataset(X_val, y_val, categorical_feature=categorical_feature)
@@ -215,6 +218,11 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     # remove params not needed to be recorded in grid search history csv
     lgb_params.pop('categorical_column', None)
     lgb_params.pop('verbose', None)
+    # add params that are needed to be recorded in grid search history csv
+    if cv:
+        lgb_params['cv'] = True
+        lgb_params['cv_nfold'] = nfold
+        lgb_params['cv_stratified'] = stratified
 
     return lgb_params, run_id
 
@@ -293,8 +301,84 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
     return nn_params, run_id
 
 
+def _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
+            gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
+            do_preds, X_test, y_test, preds_save_path):
+    xgb_params, seed = gs_params_gen(gs_model)
+    nbr = xgb_params['num_boost_round']
+    esr = xgb_params['early_stopping_rounds']
+
+    metric = xgb_params['eval_metric']
+    run_id = utils.get_random_string()  # also works as the index of the result dataframe
+
+    xgb_params['timestamp'] = utils.get_time()
+    gs_start_time = time.time()
+    if cv:
+        # use ALL data to do cv
+        xgb_train = xgb.DMatrix(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]))
+        eval_hist = xgb.cv(xgb_params, xgb_train, nfold=nfold, stratified=stratified,
+                           early_stopping_rounds=esr, num_boost_round=nbr,
+                           verbose_eval=verbose_eval, seed=seed)
+        del xgb_train; gc.collect()
+        best_round = len(eval_hist['test-'+metric+'-mean'])
+        xgb_params['best_round'] = best_round
+        cv_val_metric = eval_hist['test-'+metric+'-mean'].values[-1]
+        xgb_params['val_' + metric] = cv_val_metric
+        cv_train_metric = eval_hist['train-'+metric+'-mean'].values[-1]
+        xgb_params['train_' + metric] = cv_train_metric
+        module_logger.info('val_{}: {:.5f} | train_{}: {:.5f} (cv)'
+                           .format(metric, cv_val_metric, metric, cv_train_metric))
+        xgb_params['cv'] = True
+    else:
+        xgb_train = xgb.DMatrix(X_train, y_train)
+        xgb_val = xgb.DMatrix(X_val, y_val)
+        evals_res = {}
+        model = xgb.train(xgb_params, xgb_train, num_boost_round=nbr, early_stopping_rounds=esr,
+                          evals=[(xgb_val, 'val')], evals_result=evals_res, verbose_eval=verbose_eval)
+        del xgb_train, xgb_val; gc.collect()
+        xgb_params['best_round'] = model.best_iteration
+        val_metric = evals_res['val'][metric][-1]
+        xgb_params['val_' + metric] = val_metric
+        # train_metric = evals_res['train'][metric][-1]
+        # xgb_params['train_' + metric] = train_metric
+        module_logger.info('val_{}: {:.5f} (not cv, no train)'.format(metric, val_metric))
+
+    # time spent in this round of search, in format hh:mm:ss
+    gs_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - gs_start_time)))
+    xgb_params['gs_timespent'] = gs_elapsed_time_as_hhmmss
+
+    if do_preds:
+        predict_start_time = time.time()
+        module_logger.info('[do_preds] is True, generating predictions ...')
+        best_round = xgb_params['best_round']
+        module_logger.info('Retrain model using best_round [{}] and all data...'.format(best_round))
+        xgb_all_data = xgb.DMatrix(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]))
+        xgb_test = xgb.DMatrix(X_test)
+        evals_res = {}
+        eval_data_name = 'all_data'
+        model = xgb.train(xgb_params, xgb_all_data, evals=[(xgb_all_data, eval_data_name)], evals_result=evals_res,
+                          num_boost_round=best_round, verbose_eval=int(0.2 * best_round))
+        module_logger.info('Training done. Iteration: {} | train_{}: {:.5f}'
+                           .format(best_round, metric, evals_res[eval_data_name][metric][-1]))
+        del xgb_all_data; gc.collect()
+        y_test_pred = model.predict(xgb_test)
+
+        if y_test is not None:
+            module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
+
+        np.save(preds_save_path + 'xgb_preds_{}'.format(run_id), y_test_pred)
+        predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
+        xgb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
+        module_logger.info('XGB predictions({}) saved in {}.'.format(run_id, preds_save_path))
+
+    # remove params not needed to be recorded in grid search history csv
+    # xgb_params.pop('verbose', None)
+
+    return xgb_params, run_id
+
+
 def _catb_gs(X_train, y_train, X_val, y_val, categorical_feature,
-             gs_params_gen, gs_model, cv, nfold, verbose_eval,
+             gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
              do_preds, X_test, y_test, preds_save_path):
     catb_params, seed = gs_params_gen(gs_model)
     model = catb.CatBoostClassifier(**catb_params)
@@ -303,59 +387,68 @@ def _catb_gs(X_train, y_train, X_val, y_val, categorical_feature,
     metric = catb_params['eval_metric']
     run_id = utils.get_random_string()  # also works as the index of the result dataframe
 
-    catb_params['timestamp'] = utils.get_time()
+    res_dict = {}
+    res_dict['timestamp'] = utils.get_time()
     gs_start_time = time.time()
     if cv:
         # use ALL data to do cv
         eval_hist = catb.cv(
             catb.Pool(pd.concat([X_train, X_val]), pd.concat([y_train, y_val]),
                       cat_features=categorical_features_indices),
-            model.get_params()
+            model.get_params(),
+            nfold=nfold,
+            stratified=stratified,
+            verbose_eval=verbose_eval
         )
         best_round = eval_hist['test-'+metric+'-mean'].values.argmax()
         catb_params['iterations'] = best_round
         cv_val_metric = eval_hist['test-'+metric+'-mean'][best_round]
-        catb_params['val_' + metric] = cv_val_metric
+        res_dict['val_' + metric] = cv_val_metric
         cv_train_metric = eval_hist['train-'+metric+'-mean'][best_round]
-        catb_params['train_' + metric] = cv_train_metric
+        res_dict['train_' + metric] = cv_train_metric
         module_logger.info('val_{}: {:.5f} | train_{}: {:.5f} (cv)'
                            .format(metric, cv_val_metric, metric, cv_train_metric))
-        catb_params['cv'] = True
+        res_dict['cv'] = True
     else:
-        evals_res = {}
-        model.fit(X_train, y_train, cat_featues=categorical_features_indices, eval_set=(X_val, y_val))
+        model.fit(X_train, y_train, cat_features=categorical_features_indices,
+                  eval_set=[(X_val, y_val), (X_train, y_train)], verbose_eval=verbose_eval)
         catb_params['iterations'] = model.tree_count_
-        val_metric = evals_res['val'][metric][-1]
-        catb_params['val_' + metric] = val_metric
-        # train_metric = evals_res['train'][metric][-1]
-        # catb_params['train_' + metric] = train_metric
-        module_logger.info('val_{}: {:.5f} (not cv, no train)'.format(metric, val_metric))
+        val_metric = roc_auc_score(y_val, model.get_test_evals()[0][0])
+        res_dict['val_' + metric] = val_metric
+        train_metric = roc_auc_score(y_train, model.get_test_evals()[1][0])
+        res_dict['train_' + metric] = train_metric
+        module_logger.info('val_{}: {:.5f} | train_{}: {:.5f} (not cv)'
+                           .format(metric, val_metric, metric, train_metric))
 
     # time spent in this round of search, in format hh:mm:ss
     gs_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - gs_start_time)))
-    catb_params['gs_timespent'] = gs_elapsed_time_as_hhmmss
+    res_dict['gs_timespent'] = gs_elapsed_time_as_hhmmss
 
     if do_preds:
         predict_start_time = time.time()
         module_logger.info('[do_preds] is True, generating predictions ...')
         module_logger.info('Retrain model using best_round [{}] and all data...'.format(best_round))
+        model = catb.CatBoostClassifier(**catb_params)
         X_all = pd.concat([X_train, X_val])
-        y_all_= pd.concat([y_train, y_val])
-        model.fit(X_all, y_all, cat_features=categorical_features_indices, eval_set=(X_all, y_all))
+        y_all = pd.concat([y_train, y_val])
+        model.fit(X_all, y_all, cat_features=categorical_features_indices, eval_set=(X_all, y_all),
+                  verbose_eval=int(0.2*catb_params['iterations']))
+        all_metric = roc_auc_score(y_all, model.get_test_evals()[0][0])
         module_logger.info('Training done. Iteration: {} | train_{}: {:.5f}'
-                           .format(best_round, metric, evals_res[eval_data_name][metric][-1]))
-        del catb_all_data; gc.collect()
-        y_test_pred = model.predict(catb_test)
+                           .format(best_round, metric, all_metric))
+        del X_all, y_all; gc.collect()
+        y_test_pred = model.predict_proba(X_test)[:, 1]
 
         if y_test is not None:
             module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
 
         np.save(preds_save_path + 'catb_preds_{}'.format(run_id), y_test_pred)
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
-        catb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
-        module_logger.info('XGB predictions({}) saved in {}.'.format(run_id, preds_save_path))
+        res_dict['pred_timespent'] = predict_elapsed_time_as_hhmmss
+        module_logger.info('CatB predictions({}) saved in {}.'.format(run_id, preds_save_path))
 
     # remove params not needed to be recorded in grid search history csv
     # catb_params.pop('verbose', None)
+    catb_params.update(res_dict)
 
     return catb_params, run_id
