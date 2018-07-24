@@ -54,7 +54,7 @@ def params_gen(model='lgb'):
         params = {
             'objective': 'binary',
             'boosting': 'gbdt',
-            'num_boost_round': 10,
+            'num_boost_round': 30,
             'learning_rate': np.random.choice([0.1, 0.03]),  # 0.001]),
             'num_leaves': np.random.choice([15, 31]),  # ,61,127]),
             'num_threads': 8,  # best speed: set to number of real cpu cores, which is vCPU/2
@@ -173,6 +173,20 @@ def divert_printout_to_file():
     sys.stdout = Logger(logfilename='logfile')
 
 
+def kaggle_auto_sub(npyfile):
+    import os
+    import numpy as np
+    import pandas as pd
+    pred = np.load(npyfile+'.npy')
+    path = '/home/kai/data/shiyi/AlphaBoosting/automl/automl_app/project1/'
+    sub = pd.read_csv(path+'data/sample_submission.csv')
+    sub['TARGET'] = pred
+    filename = path+'subs/'+npyfile.split('/')[-1]+'.csv.gz'
+    sub.to_csv(filename, index=False, compression='gzip')
+    cmd = 'kaggle competitions submit -c titanic -f ' +filename+ ' -m "auto submitted"'
+    os.system(cmd)
+
+
 if __name__ == '__main__':
 
     # divert_printout_to_file()  # note: comment this to use pdb
@@ -193,4 +207,4 @@ if __name__ == '__main__':
     logger_config.config(project_path + 'project.log', file_loglevel=logging.INFO)
     automl_config_file = project_path + 'automl_config.json'
     run_record_file_name = project_path + 'last_run_record.json'  # don't created this file
-    AlphaBoosting(automl_config_file, features_to_gen, params_gen)
+    AlphaBoosting(automl_config_file, features_to_gen, params_gen, kaggle_auto_sub)

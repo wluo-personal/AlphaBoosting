@@ -22,11 +22,11 @@
     "gs_cv": true,
     "gs_cv_stratified": false,
     "gs_nfold": 10,
-    "gs_verbose_eval": 10,
+    "gs_verbose_eval": 500,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
-    "build_stacknet_layers": [1,2],
+    "build_stacknet_layers": [1],
     "oof_nfolds": 10,
     "top_n_per_gs_res_for_layer1": 2,
     "top_n_by": "auc",

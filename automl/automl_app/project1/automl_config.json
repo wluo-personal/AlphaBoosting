@@ -14,7 +14,7 @@
     
     "debug_data": 0.05,
         
-    "gs_models": "catb",
+    "gs_models": "lgb",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",

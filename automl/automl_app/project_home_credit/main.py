@@ -91,13 +91,13 @@ def params_gen(model='lgb'):
         }
     elif model == 'catb':
         params = {
-            'iterations': 5000,
+            'iterations': 12000,
             'depth': np.random.randint(4, 10),
             'l2_leaf_reg': np.random.randint(0, 31) / 10,
             #     'custom_metric': 'AUC',
             'eval_metric': 'AUC',
             'random_seed': seed,
-            # 'use_best_model': True,  # comment this if doing cv
+            # 'use_best_model': True,  # comment this if not doing cv
             'logging_level': 'Verbose',
             'thread_count': 15
         }
@@ -172,9 +172,24 @@ def divert_printout_to_file():
     sys.stdout = Logger(logfilename='logfile')
 
 
+def kaggle_auto_sub(npyfile):
+    import os
+    import numpy as np
+    import pandas as pd
+    pred = np.load(npyfile + '.npy')
+    path = '/home/kai/data/shiyi/AlphaBoosting/automl/automl_app/project_home_credit/'
+    sub = pd.read_csv(path + 'data/sample_submission.csv')
+    sub['TARGET'] = pred
+    filename = path + 'subs/' + npyfile.split('/')[-1] + '.csv.gz'
+    sub.to_csv(filename, index=False, compression='gzip')
+    cmd = 'kaggle competitions submit -c titanic -f ' + filename + ' -m "auto submitted"'
+    os.system(cmd)
+
+
 if __name__ == '__main__':
 
-    divert_printout_to_file()  # note: comment this to use pdb
+    # seems not needed to divert if using nohup python main.py &
+    # divert_printout_to_file()  # note: comment this to use pdb
 
     categorical_features = ['blabla']  # does not matter since not using the fe library.
     # features_to_gen = get_features_to_gen([fe.count, fe.unique_count,
@@ -192,4 +207,4 @@ if __name__ == '__main__':
     logger_config.config(project_path + 'project.log', file_loglevel=logging.INFO)
     automl_config_file = project_path + 'automl_config.json'
     run_record_file_name = project_path + 'last_run_record.json'  # don't created this file
-    AlphaBoosting(automl_config_file, features_to_gen, params_gen)
+    AlphaBoosting(automl_config_file, features_to_gen, params_gen, kaggle_auto_sub)

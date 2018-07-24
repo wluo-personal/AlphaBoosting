@@ -1,6 +1,7 @@
 import time
 import os
 import gc
+import sys
 from datetime import timedelta
 import pandas as pd
 import numpy as np
@@ -21,7 +22,7 @@ module_logger = logging.getLogger(__name__)
 
 def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_rounds,
        gs_record_dir, gs_params_gen, gs_models, cv, nfold, stratified,
-       verbose_eval, do_preds, X_test, y_test, preds_save_path, suppress_warning, **kwargs):
+       verbose_eval, do_preds, X_test, y_test, auto_sub_func, preds_save_path, suppress_warning, **kwargs):
 
     if suppress_warning:
         import warnings
@@ -38,23 +39,23 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                 if gs_model == 'logreg' or gs_model == 'svc':
                     params, run_id = _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                                     gs_params_gen, gs_model, cv, nfold, verbose_eval,
-                                                    do_preds, X_test, y_test, preds_save_path)
+                                                    do_preds, X_test, y_test, auto_sub_func, preds_save_path)
                 elif gs_model == 'lgb':
                     params, run_id = _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                              gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
-                                             do_preds, X_test, y_test, preds_save_path)
+                                             do_preds, X_test, y_test, auto_sub_func, preds_save_path)
                 elif gs_model == 'nn':
                     params, run_id = _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                             gs_params_gen, gs_model, verbose_eval,
-                                            do_preds, X_test, y_test, preds_save_path)
+                                            do_preds, X_test, y_test, auto_sub_func, preds_save_path)
                 elif gs_model == 'xgb':
                     params, run_id = _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                              gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
-                                             do_preds, X_test, y_test, preds_save_path)
+                                             do_preds, X_test, y_test, auto_sub_func, preds_save_path)
                 elif gs_model == 'catb':
                     params, run_id = _catb_gs(X_train, y_train, X_val, y_val, categorical_feature,
                                               gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
-                                              do_preds, X_test, y_test, preds_save_path)
+                                              do_preds, X_test, y_test, auto_sub_func, preds_save_path)
 
                 params['data_name'] = data_name
                 # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
@@ -84,7 +85,7 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
 
 def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, verbose_eval,
-            do_preds, X_test, y_test, preds_save_path):
+            do_preds, X_test, y_test, auto_sub_func, preds_save_path):
     """
     TODO: untested. bad performance, hence not priority.
     """
@@ -144,7 +145,13 @@ def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
         if y_test is not None:
             module_logger.info('(_{}_gs) roc of test: {}'.format(gs_model, roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + gs_model + '_preds_{}'.format(run_id), y_test_pred)
+        pred_npy_file = preds_save_path + gs_model + '_preds_{}'.format(run_id)
+        np.save(pred_npy_file, y_test_pred)
+        if auto_sub_func is not None:
+            try:
+                auto_sub_func(pred_npy_file)
+            except:
+                print('Auto Submission Failed: ', sys.exc_info()[0])
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         params['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('{} predictions({}) saved in {}.'.format(gs_model, run_id, preds_save_path))
@@ -154,7 +161,7 @@ def _svc_logreg_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
 def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
-            do_preds, X_test, y_test, preds_save_path):
+            do_preds, X_test, y_test, auto_sub_func, preds_save_path):
     lgb_params, seed = gs_params_gen(gs_model)
     metric = lgb_params['metric']
     run_id = utils.get_random_string()  # also works as the index of the result dataframe
@@ -208,9 +215,15 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         y_test_pred = model.predict(X_test)
 
         if y_test is not None:
-            module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
+            module_logger.info('(_lgb_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + 'lgb_preds_{}'.format(run_id), y_test_pred)
+        pred_npy_file = preds_save_path + 'lgb_preds_{}'.format(run_id)
+        np.save(pred_npy_file, y_test_pred)
+        if auto_sub_func is not None:
+            try:
+                auto_sub_func(pred_npy_file)
+            except:
+                print('Auto Submission Failed: ', sys.exc_info()[0])
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         lgb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('LGB predictions({}) saved in {}.'.format(run_id, preds_save_path))
@@ -229,7 +242,7 @@ def _lgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
 def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
            gs_params_gen, gs_model, verbose_eval,
-           do_preds, X_test, y_test, preds_save_path):
+           do_preds, X_test, y_test, auto_sub_func, preds_save_path):
     nn_params, seed = gs_params_gen(gs_model)
     # time.sleep(1)  # sleep 1 sec to make sure the run_id is unique
     run_id = utils.get_random_string()
@@ -293,7 +306,13 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
         if y_test is not None:
             module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + 'nn_preds_{}'.format(run_id), y_test_pred)
+        pred_npy_file = preds_save_path + 'nn_preds_{}'.format(run_id)
+        np.save(pred_npy_file, y_test_pred)
+        if auto_sub_func is not None:
+            try:
+                auto_sub_func(pred_npy_file)
+            except:
+                print('Auto Submission Failed: ', sys.exc_info()[0])
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         nn_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('NN predictions({}) saved in {}.'.format(run_id, preds_save_path))
@@ -303,7 +322,7 @@ def _nn_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
 def _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
             gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
-            do_preds, X_test, y_test, preds_save_path):
+            do_preds, X_test, y_test, auto_sub_func, preds_save_path):
     xgb_params, seed = gs_params_gen(gs_model)
     nbr = xgb_params['num_boost_round']
     esr = xgb_params['early_stopping_rounds']
@@ -364,9 +383,15 @@ def _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         y_test_pred = model.predict(xgb_test)
 
         if y_test is not None:
-            module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
+            module_logger.info('(_xgb_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + 'xgb_preds_{}'.format(run_id), y_test_pred)
+        pred_npy_file = preds_save_path + 'xgb_preds_{}'.format(run_id)
+        np.save(pred_npy_file, y_test_pred)
+        if auto_sub_func is not None:
+            try:
+                auto_sub_func(pred_npy_file)
+            except:
+                print('Auto Submission Failed: ', sys.exc_info()[0])
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         xgb_params['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('XGB predictions({}) saved in {}.'.format(run_id, preds_save_path))
@@ -379,7 +404,7 @@ def _xgb_gs(X_train, y_train, X_val, y_val, categorical_feature,
 
 def _catb_gs(X_train, y_train, X_val, y_val, categorical_feature,
              gs_params_gen, gs_model, cv, nfold, stratified, verbose_eval,
-             do_preds, X_test, y_test, preds_save_path):
+             do_preds, X_test, y_test, auto_sub_func, preds_save_path):
     catb_params, seed = gs_params_gen(gs_model)
     model = catb.CatBoostClassifier(**catb_params)
     categorical_features_indices = [X_train.columns.tolist().index(col) for col in categorical_feature]
@@ -442,7 +467,13 @@ def _catb_gs(X_train, y_train, X_val, y_val, categorical_feature,
         if y_test is not None:
             module_logger.info('(_nn_gs) roc of test: {}'.format(roc_auc_score(y_test, y_test_pred)))
 
-        np.save(preds_save_path + 'catb_preds_{}'.format(run_id), y_test_pred)
+        pred_npy_file = preds_save_path + 'catb_preds_{}'.format(run_id)
+        np.save(pred_npy_file, y_test_pred)
+        if auto_sub_func is not None:
+            try:
+                auto_sub_func(pred_npy_file)
+            except:
+                print('Auto Submission Failed: ', sys.exc_info()[0])
         predict_elapsed_time_as_hhmmss = str(timedelta(seconds=int(time.time() - predict_start_time)))
         res_dict['pred_timespent'] = predict_elapsed_time_as_hhmmss
         module_logger.info('CatB predictions({}) saved in {}.'.format(run_id, preds_save_path))

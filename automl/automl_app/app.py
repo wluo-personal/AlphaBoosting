@@ -17,7 +17,7 @@ class AlphaBoosting:
         GRID_SEARCH = 6
         STACKNET = 7
 
-    def __init__(self, config_file, features_to_gen, params_gen):
+    def __init__(self, config_file, features_to_gen, params_gen, auto_sub_func=None):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
         self.logger.info('='*10+'START'+'='*10)
 
@@ -34,6 +34,8 @@ class AlphaBoosting:
             
         self.features_to_gen = features_to_gen
         self.params_gen = params_gen
+        if auto_sub_func is not None:
+            self.auto_sub_func = auto_sub_func
 
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
@@ -281,6 +283,7 @@ class AlphaBoosting:
                            cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
                            stratified=self.config_dict['gs_cv_stratified'],
                            do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
+                           auto_sub_func=self.auto_sub_func,
                            preds_save_path=self.OUTDIR+'gs_saved_preds/',
                            suppress_warning=gs_sup_warning)
             del train, val, test; gc.collect()
