@@ -6,6 +6,7 @@ from scipy.sparse import csr_matrix, hstack, vstack
 from enum import Enum
 import pickle
 import copy
+import sys
 import logging
 from automl_libs import SklearnBLE, NNBLE
 module_logger = logging.getLogger(__name__)
@@ -572,7 +573,8 @@ def combine_layer_oof_per_label(layer1_oof_dict, label):
     return x
 
 
-def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed, metric, metrics_callback=None):
+def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed, auto_sub_func,
+                       metric, metrics_callback=None):
     """
     Params:
         model_pool: dict. key: an option from ModelName. value: A model
@@ -626,6 +628,11 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
                 model.train(x_train, train[label])
                 est_preds = model.predict(x_test)
             est_preds = np.array(est_preds).reshape(-1, )
+            if auto_sub_func is not None:
+                try:
+                    auto_sub_func(est_preds, model_id)
+                except:
+                    print('Auto Submission Failed: ', sys.exc_info()[0])
 
             if model_id not in layer2_est_preds:
                 layer2_est_preds[model_id] = np.empty((x_test.shape[0], len(label_cols)))

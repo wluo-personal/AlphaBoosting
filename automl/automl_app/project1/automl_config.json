@@ -18,7 +18,7 @@
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
-    "gs_search_rounds": 2,
+    "gs_search_rounds": 1,
     "gs_cv": false,
     "gs_cv_stratified": false,
     "gs_nfold": 4,

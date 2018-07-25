@@ -173,15 +173,14 @@ def divert_printout_to_file():
     sys.stdout = Logger(logfilename='logfile')
 
 
-def kaggle_auto_sub(npyfile):
+def kaggle_auto_sub(preds, subfilename):
     import os
     import numpy as np
     import pandas as pd
-    pred = np.load(npyfile+'.npy')
     path = '/home/kai/data/shiyi/AlphaBoosting/automl/automl_app/project1/'
     sub = pd.read_csv(path+'data/sample_submission.csv')
-    sub['TARGET'] = pred
-    filename = path+'subs/'+npyfile.split('/')[-1]+'.csv.gz'
+    sub['TARGET'] = preds
+    filename = path+'subs/'+subfilename+'.csv.gz'
     sub.to_csv(filename, index=False, compression='gzip')
     cmd = 'kaggle competitions submit -c titanic -f ' +filename+ ' -m "auto submitted"'
     os.system(cmd)
@@ -207,4 +206,4 @@ if __name__ == '__main__':
     logger_config.config(project_path + 'project.log', file_loglevel=logging.INFO)
     automl_config_file = project_path + 'automl_config.json'
     run_record_file_name = project_path + 'last_run_record.json'  # don't created this file
-    AlphaBoosting(automl_config_file, features_to_gen, params_gen, None)#, kaggle_auto_sub)
+    AlphaBoosting(automl_config_file, features_to_gen, params_gen, None)# kaggle_auto_sub)

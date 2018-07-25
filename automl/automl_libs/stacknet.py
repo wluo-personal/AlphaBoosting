@@ -150,7 +150,8 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                     base_layer_results_repo.save()
 
 
-def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thresh_or_chosen, layer2_models):
+def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thresh_or_chosen, layer2_models,
+           auto_sub_func):
     """
     :param train: DataFrame with label
     :param y_test: array-like. In Kaggle, we don't know it.
@@ -203,7 +204,7 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thres
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
         compute_layer2_oof(model_pool, layer2_inputs, train, label_cols,
-                           5, 2018, metric=metric, metrics_callback=metrics_callback)
+                           5, 2018, auto_sub_func, metric=metric, metrics_callback=metrics_callback)
 
     base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
                                 layer2_cv_score, layer2_model_data_list)

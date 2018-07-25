@@ -313,7 +313,7 @@ class AlphaBoosting:
                 stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
                                 oof_path=oof_path, metric=self.config_dict['report_metric'],
                                 layer1_thresh_or_chosen=self.config_dict['layer1_thresh_or_chosen_for_layer2'],
-                                layer2_models=self.config_dict['layer2_models'])
+                                layer2_models=self.config_dict['layer2_models'], auto_sub_func=self.auto_sub_func)
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.TEMP_DATADIR + 'todo_list.json')
 

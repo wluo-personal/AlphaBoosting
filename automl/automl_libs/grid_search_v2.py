@@ -68,11 +68,13 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                         module_logger.info(
                             '(_{}_gs) roc of test: {}'.format(gs_model, roc_auc_score(y_test, y_test_pred)))
 
-                    pred_npy_file = preds_save_path + 'lgb_preds_{}'.format(run_id)
+                    pred_npy_file = preds_save_path + '{}_preds_{}'.format(gs_model, run_id)
                     np.save(pred_npy_file, y_test_pred)
                     if auto_sub_func is not None:
                         try:
-                            auto_sub_func(pred_npy_file)
+                            preds = np.load(pred_npy_file+'.npy')
+                            subfilename = pred_npy_file.split('/')[-1]
+                            auto_sub_func(preds, subfilename)
                         except:
                             print('Auto Submission Failed: ', sys.exc_info()[0])
 
