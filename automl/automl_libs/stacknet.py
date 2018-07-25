@@ -15,7 +15,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, params_gen,
-           top_n_gs, top_n_by, oof_nfolds, oof_path, metric, gs_result_path=''):
+           layer1_models, top_n_gs, top_n_by, oof_nfolds, oof_path, metric, gs_result_path=''):
     """
     :param data_name: data name. e.g. 'ordinal', 'one_hot', etc
     :param train: DataFrame with label
@@ -47,6 +47,8 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
     for filename in listdir(gs_result_path):
         if '_grid_search' in filename:
             model_type = filename.split('_')[0]  # LGB, NN, etc...
+            if layer1_models is None:
+                layer1_models = ['xgb', 'lgb', 'catb', 'nn']
             try:
                 # in grid search result of catboost, it's 'val_AUC',
                 # in all other models, it's 'val_auc'
@@ -87,29 +89,30 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                             params[int_list_name] = ast.literal_eval(ast.literal_eval(params[int_list_name]))
 
                     params['categorical_feature'] = categorical_cols
-                    if model_type == 'lgb':
+                    if model_type == 'lgb' and model_type in layer1_models:
                         params['verbose_eval'] = int(params['best_round'] / 10)
                         base_layer_estimator = LightgbmBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.LGB.name] = base_layer_estimator
                         bldr.add_compatible_model(data_name, ModelName.LGB.name)
-                    elif model_type == 'xgb':
+                    elif model_type == 'xgb' and model_type in layer1_models:
                         params['verbose_eval'] = int(params['best_round'] / 10)
                         base_layer_estimator = XgboostBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.XGB.name] = base_layer_estimator
                         bldr.add_compatible_model(data_name, ModelName.XGB.name)
-                    elif model_type == 'catb':
+                    elif model_type == 'catb' and model_type in layer1_models:
                         original_params_example, _ = params_gen('catb')
                         keys_in_original_params = original_params_example.keys()
                         model_params = {}
                         for key in keys_in_original_params:
                             model_params[key] = params[key]
+                        model_params['iterations'] = params['best_round']
                         print(model_params)
                         model_params['categorical_feature'] = categorical_cols
                         model_params['verbose_eval'] = int(params['iterations'] / 10)
                         base_layer_estimator = CatBoostBLE(params=model_params)
                         model_pool[str(k)+'__'+ModelName.CATB.name] = base_layer_estimator
                         bldr.add_compatible_model(data_name, ModelName.CATB.name)
-                    elif model_type == 'nn':
+                    elif model_type == 'nn' and model_type in layer1_models:
                         params['verbose_eval'] = 1
                         base_layer_estimator = NNBLE(params=params)
                         model_pool[str(k)+'__'+ModelName.NN.name] = base_layer_estimator

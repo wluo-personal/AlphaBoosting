@@ -38,7 +38,7 @@ class ModelName(Enum):
     CATB = 23
 
 
-class BaseLayerDataRepo():
+class BaseLayerDataRepo:
     def __init__(self):
         self._data_repo = {}
         

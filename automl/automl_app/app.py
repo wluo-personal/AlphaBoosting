@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import os, json, gc, logging, shutil, pickle, time
-from automl_libs import utils, grid_search, nn_libs, stacknet
+from automl_libs import utils, grid_search, grid_search_v2, nn_libs, stacknet
 from enum import Enum
 import pdb
 
@@ -34,8 +34,7 @@ class AlphaBoosting:
             
         self.features_to_gen = features_to_gen
         self.params_gen = params_gen
-        if auto_sub_func is not None:
-            self.auto_sub_func = auto_sub_func
+        self.auto_sub_func = auto_sub_func
 
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
@@ -276,7 +275,7 @@ class AlphaBoosting:
             gs_do_preds = self.config_dict['gs_do_preds']
             gs_sup_warning = self.config_dict['gs_suppress_warning']
 
-            grid_search.gs(data_name, X_train, y_train, X_val, y_val,
+            grid_search_v2.gs(data_name, X_train, y_train, X_val, y_val,
                            categorical_features, search_rounds=gs_search_rounds,
                            gs_record_dir=gs_record_dir,
                            gs_params_gen=self.params_gen, gs_models=gs_models,
@@ -305,7 +304,8 @@ class AlphaBoosting:
             self.logger.info('layers to be built: {}'.format(layers_to_built))
             if 1 in layers_to_built:
                 stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
-                                params_gen=self.params_gen, top_n_by=self.config_dict['top_n_by'],
+                                params_gen=self.params_gen, layer1_models=self.config_dict['layer1_models'],
+                                top_n_by=self.config_dict['top_n_by'],
                                 top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1'],
                                 oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
                                 metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)

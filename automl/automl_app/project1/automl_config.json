@@ -14,26 +14,27 @@
     
     "debug_data": 0.05,
         
-    "gs_models": "lgb",
+    "gs_models": "nn",
     "categorical_features": ["Month", "DayofMonth", "DayOfWeek", "DepTime", "UniqueCarrier", "Origin", "Dest", "Distance"],
     "not_features": [],
     "label": "label",
     "gs_search_rounds": 2,
-    "gs_cv": true,
+    "gs_cv": false,
     "gs_cv_stratified": false,
     "gs_nfold": 4,
-    "gs_verbose_eval": 5,
+    "gs_verbose_eval": 1,
     "gs_do_preds": true,
     "gs_suppress_warning": true,
         
-    "build_stacknet_layers": [1],
+    "build_stacknet_layers": [1,2],
     "oof_nfolds": 4,
-    "top_n_per_gs_res_for_layer1": 3,
+    "layer1_models": ["lgb", "xgb", "catb", "nn"],
+    "top_n_per_gs_res_for_layer1": 1,
     "top_n_by": "auc",
     "report_metric": "auc",
     "layer1_thresh_or_chosen_for_layer2": 0.6,
     "layer2_models": ["logreg", "nn"],
-    
+
     "_comments": {
         "validation": "validation_index overrules validation_ratio",
         "validation_ratio" : "range(exclusive): (0,1)",
@@ -48,6 +49,7 @@
         ],
         "debug_data": "(0,1): only use this percentage of train and val data (test data not changed). int that > 1, use the first n rows",
         "gs_model": "lgb, nn, lgb|nn. grid search models",
+        "layer1_models": "a list of chosen models. e.g. [lgb, xgb, catb, nn]. if null, all models found in grid search result will be checked",
         "top_n_gs": "number of gs params will be chosen to generate stacknet layer1 models",
         "layer1_thresh": "threshold(based on gs_val_auc) to choosen from layer1 models to construct layer2 models"
     }

@@ -110,8 +110,8 @@ def params_gen(model='lgb'):
             'lr_fin': np.random.randint(1, 5) / 1000,  # if == lr_init, then no lr decay
             'batch_size': np.random.choice([128, 256, 512, 1024]),
             "pred_batch_size": 5000,
-            'max_ep': 100,
-            'patience': 10,  # np.random.randint(10, 25),
+            'max_ep': 5,
+            'patience': 1,  # np.random.randint(10, 25),
             'cat_emb_outdim': 30,  # could be a constant or a dict (col name:embed out dim). e.g.:
             # embed_outdim = [3, 3, 8, 8, 3]
             # embed_outdim_dict = dict(zip(X_train.columns.values, embed_outdim))
@@ -207,4 +207,4 @@ if __name__ == '__main__':
     logger_config.config(project_path + 'project.log', file_loglevel=logging.INFO)
     automl_config_file = project_path + 'automl_config.json'
     run_record_file_name = project_path + 'last_run_record.json'  # don't created this file
-    AlphaBoosting(automl_config_file, features_to_gen, params_gen, kaggle_auto_sub)
+    AlphaBoosting(automl_config_file, features_to_gen, params_gen, None)#, kaggle_auto_sub)

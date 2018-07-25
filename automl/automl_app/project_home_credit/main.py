@@ -182,7 +182,7 @@ def kaggle_auto_sub(npyfile):
     sub['TARGET'] = pred
     filename = path + 'subs/' + npyfile.split('/')[-1] + '.csv.gz'
     sub.to_csv(filename, index=False, compression='gzip')
-    cmd = 'kaggle competitions submit -c titanic -f ' + filename + ' -m "auto submitted"'
+    cmd = 'kaggle competitions submit -c home-credit-default-risk -f ' + filename + ' -m "auto submitted"'
     os.system(cmd)
 
 
