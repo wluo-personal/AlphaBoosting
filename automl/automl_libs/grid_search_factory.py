@@ -78,7 +78,6 @@ class LgbGS(GridSearch):
 
     def cv(self, nfold, stratified):
         gs_start_time = time.time()
-        pdb.set_trace()
         lgb_train = lgb.Dataset(pd.concat([self.X_train, self.X_val]), pd.concat([self.y_train, self.y_val]),
                                 categorical_feature=self.categorical_feature)
         eval_hist = lgb.cv(self.gs_params, lgb_train, nfold=nfold, stratified=stratified,
@@ -105,7 +104,6 @@ class LgbGS(GridSearch):
 
     def pred(self):
         predict_start_time = time.time()
-        pdb.set_trace()
         self.logger.info('Retrain model using best_round [{}] and all data...'.format(self.best_round))
         lgb_all_data = lgb.Dataset(pd.concat([self.X_train, self.X_val]), pd.concat([self.y_train, self.y_val]),
                                    categorical_feature=self.categorical_feature)
