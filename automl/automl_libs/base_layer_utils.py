@@ -311,12 +311,12 @@ class BaseLayerResultsRepo:
         #     print('{}\t{}'.format(value, key))
         return sorted_list_from_dict
 
-    def get_results(self, chosen_from_layer, threshold=None, chosen_ones=None):
+    def get_results(self, chosen_from_layer='layer1', threshold=None, chosen_ones=None):
         """
         Params:
             chosen_from_layer: 'layer1', 'layer2'
             threshold: if not None, then return only ones in specified [layer] with score >= threshold
-            chosen_ones: list of model_data_id. ignores parameter: layer
+            chosen_ones: list of model_data_id. ignores parameter: chosen_from_layer
             Note:
                 1. threshold and chosen_ones can NOT both have value
                 2. if threshold and chosen_ones are both None, return all
@@ -574,7 +574,7 @@ def combine_layer_oof_per_label(layer1_oof_dict, label):
 
 
 def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed, auto_sub_func,
-                       metric, metrics_callback=None):
+                       preds_save_path, metric, metrics_callback=None):
     """
     Params:
         model_pool: dict. key: an option from ModelName. value: A model
@@ -628,6 +628,11 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
                 model.train(x_train, train[label])
                 est_preds = model.predict(x_test)
             est_preds = np.array(est_preds).reshape(-1, )
+
+            pred_npy_file = preds_save_path + '{}_preds'.format(model_id)
+            np.save(pred_npy_file, est_preds)
+            module_logger.info('StackNet layer2 predictions({}) saved in {}.'.format(model_id, preds_save_path))
+
             if auto_sub_func is not None:
                 try:
                     auto_sub_func(est_preds, model_id)

@@ -64,12 +64,14 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                     gs_res_dict['pred_timespent'] = pred_elapsed_time
                     module_logger.info('Pred time spent: {}'.format(pred_elapsed_time))
 
+                    pred_npy_file = preds_save_path + '{}_preds_{}'.format(gs_model, run_id)
+                    np.save(pred_npy_file, y_test_pred)
+                    module_logger.info('{} predictions({}) saved in {}.'.format(gs_model, run_id, preds_save_path))
+
                     if y_test is not None:
                         module_logger.info(
                             '(_{}_gs) roc of test: {}'.format(gs_model, roc_auc_score(y_test, y_test_pred)))
 
-                    pred_npy_file = preds_save_path + '{}_preds_{}'.format(gs_model, run_id)
-                    np.save(pred_npy_file, y_test_pred)
                     if auto_sub_func is not None:
                         try:
                             preds = np.load(pred_npy_file+'.npy')
@@ -78,7 +80,6 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                         except:
                             print('Auto Submission Failed: ', sys.exc_info()[0])
 
-                    module_logger.info('{} predictions({}) saved in {}.'.format(gs_model, run_id, preds_save_path))
 
                 # get the gs_res_dict ready for storage
                 gs_res_dict['data_name'] = data_name

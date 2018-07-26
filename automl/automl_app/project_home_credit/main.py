@@ -54,19 +54,22 @@ def params_gen(model='lgb'):
         params = {
             'objective': 'binary',
             'boosting': 'gbdt',
-            'num_boost_round': 10,
-            'learning_rate': np.random.choice([0.1, 0.03]),  # 0.001]),
-            'num_leaves': np.random.choice([15, 31]),  # ,61,127]),
-            'num_threads': 8,  # best speed: set to number of real cpu cores, which is vCPU/2
-            'max_depth': -1,  # no limit. This is used to deal with over-fitting when #data is small.
-            'min_data_in_leaf': np.random.randint(20, 50),  # minimal number of data in one leaf.
-            'feature_fraction': np.random.randint(9, 11) / 10,
+            'num_boost_round': 15000, # ignored in params. extract it and put it in input arguments in train or cv explicitly
+                                   # seems to work fine as the upper limit when combined with early_stopping_round
+            'learning_rate': np.random.randint(3,20)/1000,
+#             'num_leaves': 50,
+            'num_threads': 15, # best speed: set to number of real cpu cores, which is vCPU/2
+            'max_depth': np.random.randint(4,10), # no limit. This is used to deal with over-fitting when #data is small.
+            'min_split_gain': np.random.randint(2, 100)/1000,
+            'min_child_weight': np.random.randint(2, 50),
+            'feature_fraction': np.random.randint(10,30)/100,
             'feature_fraction_seed': seed,
-            'early_stopping_round': 10,
-            'bagging_freq': 1,  # 0 means disable bagging. k: perform bagging at every k iteration
-            'bagging_fraction': np.random.randint(4, 11) / 10,  # Randomly select part of data
+            'early_stopping_round':np.random.randint(150,300),
+            'bagging_fraction': np.random.randint(70,91)/100, #Randomly select part of data
             'bagging_seed': seed,
-            'scale_pos_weight': 1,
+            'scale_pos_weight': np.random.randint(10,20)/10,
+            'lambda_l1': np.random.randint(1,10)/10,
+            'lambda_l2': np.random.randint(5,20)/10,
             'metric': 'auc'
         }
     elif model == 'xgb':
@@ -130,9 +133,9 @@ def params_gen(model='lgb'):
             'ep_for_lr': 1,
             'lr_init': 0.01,
             'lr_fin': 0.01,  # if == lr_init, then no lr decay
-            'batch_size': 128,
+            'batch_size': 2048,
             "pred_batch_size": 50000,
-            'best_epoch': 1,
+            'best_epoch': 4,
             'patience': 1,
             'categorical_feature': [],
             'cat_emb_outdim': 50,   # could be a constant or a dict (col name:embed out dim). e.g.:
@@ -172,15 +175,14 @@ def divert_printout_to_file():
     sys.stdout = Logger(logfilename='logfile')
 
 
-def kaggle_auto_sub(npyfile):
+def kaggle_auto_sub(preds, subfilename):
     import os
     import numpy as np
     import pandas as pd
-    pred = np.load(npyfile + '.npy')
     path = '/home/kai/data/shiyi/AlphaBoosting/automl/automl_app/project_home_credit/'
     sub = pd.read_csv(path + 'data/sample_submission.csv')
-    sub['TARGET'] = pred
-    filename = path + 'subs/' + npyfile.split('/')[-1] + '.csv.gz'
+    sub['TARGET'] = preds
+    filename = path + 'subs/' + subfilename + '.csv.gz'
     sub.to_csv(filename, index=False, compression='gzip')
     cmd = 'kaggle competitions submit -c home-credit-default-risk -f ' + filename + ' -m "auto submitted"'
     os.system(cmd)
@@ -207,4 +209,4 @@ if __name__ == '__main__':
     logger_config.config(project_path + 'project.log', file_loglevel=logging.INFO)
     automl_config_file = project_path + 'automl_config.json'
     run_record_file_name = project_path + 'last_run_record.json'  # don't created this file
-    AlphaBoosting(automl_config_file, features_to_gen, params_gen, kaggle_auto_sub)
+    AlphaBoosting(automl_config_file, features_to_gen, params_gen, None)#kaggle_auto_sub)

@@ -14,8 +14,8 @@ class AlphaBoosting:
         VALIDATION_DOWNSAMPLING_SPLIT = 3
         VALIDATION_DOWNSAMPLING_GEN = 4
         CONCAT_DATA = 5
-        GRID_SEARCH = 6
-        STACKNET = 7
+        # GRID_SEARCH = 6
+        # STACKNET = 7
 
     def __init__(self, config_file, features_to_gen, params_gen, auto_sub_func=None):
         self.logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
@@ -122,12 +122,18 @@ class AlphaBoosting:
         self._concat_test(to_do_dict)
         
         # grid search
-        self.logger.info('STAGE: ' + self.Stage.GRID_SEARCH.name)
-        self._grid_search(to_do_dict)
+        if self.config_dict['do_gs']:
+            self.logger.info('GRID SEARCH: Perform')
+            self._grid_search()
+        else:
+            self.logger.info('GRID SEARCH: Skip')
 
         # grid search
-        self.logger.info('STAGE: ' + self.Stage.STACKNET.name)
-        self._stacknet(to_do_dict)
+        if self.config_dict['do_stacknet']:
+            self.logger.info('STACK NET: Perform')
+            self._stacknet()
+        else:
+            self.logger.info('STACK NET: Skip')
 
         # save self.run_record_url:
         self.logger.info('save run record')
@@ -256,64 +262,65 @@ class AlphaBoosting:
                                       file_name_body=file_name_body)
             self._renew_status(to_do_dict, self.Stage.VALIDATION_DOWNSAMPLING_GEN.name, self.TEMP_DATADIR + 'todo_list.json')
 
-    def _grid_search(self, to_do_dict):
-        stage = self.Stage.GRID_SEARCH.name
-        if not to_do_dict[stage]:
-            data_name, train, val, test, y_test, categorical_features, feature_cols, label_col = self._get_final_data()
-            X_train = train[feature_cols]
-            y_train = train[label_col]
-            X_val = val[feature_cols]
-            y_val = val[label_col]
-            X_test = test[feature_cols]
+    def _grid_search(self):
+        # stage = self.Stage.GRID_SEARCH.name
+        # if not to_do_dict[stage]:
+        data_name, train, val, test, y_test, categorical_features, feature_cols, label_col = self._get_final_data()
+        X_train = train[feature_cols]
+        y_train = train[label_col]
+        X_val = val[feature_cols]
+        y_val = val[label_col]
+        X_test = test[feature_cols]
 
-            gs_models = self.config_dict['gs_models']
-            gs_record_dir = self.OUTDIR
-            gs_search_rounds = self.config_dict['gs_search_rounds']
-            gs_cv = self.config_dict['gs_cv']
-            gs_nfold = self.config_dict['gs_nfold']
-            gs_verbose_eval = self.config_dict['gs_verbose_eval']
-            gs_do_preds = self.config_dict['gs_do_preds']
-            gs_sup_warning = self.config_dict['gs_suppress_warning']
+        gs_models = self.config_dict['gs_models']
+        gs_record_dir = self.OUTDIR
+        gs_search_rounds = self.config_dict['gs_search_rounds']
+        gs_cv = self.config_dict['gs_cv']
+        gs_nfold = self.config_dict['gs_nfold']
+        gs_verbose_eval = self.config_dict['gs_verbose_eval']
+        gs_do_preds = self.config_dict['gs_do_preds']
+        gs_sup_warning = self.config_dict['gs_suppress_warning']
 
-            grid_search_v2.gs(data_name, X_train, y_train, X_val, y_val,
-                           categorical_features, search_rounds=gs_search_rounds,
-                           gs_record_dir=gs_record_dir,
-                           gs_params_gen=self.params_gen, gs_models=gs_models,
-                           cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
-                           stratified=self.config_dict['gs_cv_stratified'],
-                           do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
-                           auto_sub_func=self.auto_sub_func,
-                           preds_save_path=self.OUTDIR+'gs_saved_preds/',
-                           suppress_warning=gs_sup_warning)
-            del train, val, test; gc.collect()
-        self._renew_status(to_do_dict, stage, self.TEMP_DATADIR + 'todo_list.json')
+        grid_search_v2.gs(data_name, X_train, y_train, X_val, y_val,
+                       categorical_features, search_rounds=gs_search_rounds,
+                       gs_record_dir=gs_record_dir,
+                       gs_params_gen=self.params_gen, gs_models=gs_models,
+                       cv=gs_cv, nfold=gs_nfold, verbose_eval=gs_verbose_eval,
+                       stratified=self.config_dict['gs_cv_stratified'],
+                       do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
+                       auto_sub_func=self.auto_sub_func,
+                       preds_save_path=self.OUTDIR+'gs_saved_preds/',
+                       suppress_warning=gs_sup_warning)
+        del train, val, test; gc.collect()
+        # self._renew_status(to_do_dict, stage, self.TEMP_DATADIR + 'todo_list.json')
 
-    def _stacknet(self, to_do_dict):
-        if not to_do_dict[self.Stage.STACKNET.name]:
-            # seems need absolute path to save
-            oof_path = self.OUTDIR + 'oof/'
-            if not os.path.exists(oof_path):
-                os.makedirs(oof_path)
-            gs_result_path = self.OUTDIR
-            data_name, train, val, test, y_test, categorical_features, feature_cols, label_cols = self._get_final_data()
-            # convert label_cols to list so that y_train will be a dataframe, which is required stacknet layers
-            if not isinstance(label_cols, list):
-                label_cols = [label_cols]
-            train = pd.concat([train, val])
-            layers_to_built = self.config_dict['build_stacknet_layers']
-            self.logger.info('layers to be built: {}'.format(layers_to_built))
-            if 1 in layers_to_built:
-                stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
-                                params_gen=self.params_gen, layer1_models=self.config_dict['layer1_models'],
-                                top_n_by=self.config_dict['top_n_by'],
-                                top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1'],
-                                oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
-                                metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
-            if 2 in layers_to_built:
-                stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
-                                oof_path=oof_path, metric=self.config_dict['report_metric'],
-                                layer1_thresh_or_chosen=self.config_dict['layer1_thresh_or_chosen_for_layer2'],
-                                layer2_models=self.config_dict['layer2_models'], auto_sub_func=self.auto_sub_func)
+    def _stacknet(self):
+        # if not to_do_dict[self.Stage.STACKNET.name]:
+        # seems need absolute path to save
+        oof_path = self.OUTDIR + 'oof/'
+        if not os.path.exists(oof_path):
+            os.makedirs(oof_path)
+        gs_result_path = self.OUTDIR
+        data_name, train, val, test, y_test, categorical_features, feature_cols, label_cols = self._get_final_data()
+        # convert label_cols to list so that y_train will be a dataframe, which is required stacknet layers
+        if not isinstance(label_cols, list):
+            label_cols = [label_cols]
+        train = pd.concat([train, val])
+        layers_to_built = self.config_dict['build_stacknet_layers']
+        self.logger.info('layers to be built: {}'.format(layers_to_built))
+        if 1 in layers_to_built:
+            stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
+                            params_gen=self.params_gen, layer1_models=self.config_dict['layer1_models'],
+                            top_n_by=self.config_dict['top_n_by'],
+                            top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1'],
+                            oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
+                            metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
+        if 2 in layers_to_built:
+            stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
+                            oof_path=oof_path, metric=self.config_dict['report_metric'],
+                            layer1_thresh_or_chosen=self.config_dict['layer1_thresh_or_chosen_for_layer2'],
+                            layer2_models=self.config_dict['layer2_models'], auto_sub_func=self.auto_sub_func,
+                            preds_save_path=self.OUTDIR+'sn_saved_preds/')
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.TEMP_DATADIR + 'todo_list.json')
 

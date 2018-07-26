@@ -9,6 +9,7 @@ import pandas as pd
 from os import listdir
 import pdb
 import time
+import os
 import ast
 import logging, gc
 module_logger = logging.getLogger(__name__)
@@ -151,7 +152,7 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
 
 
 def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thresh_or_chosen, layer2_models,
-           auto_sub_func):
+           auto_sub_func, preds_save_path):
     """
     :param train: DataFrame with label
     :param y_test: array-like. In Kaggle, we don't know it.
@@ -164,6 +165,9 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thres
     :param layer2_models: currently support models: logreg, nn
     :return: None
     """
+    if not os.path.exists(preds_save_path):
+        os.makedirs(preds_save_path)
+
     metrics_callback = _get_metrics_callback(metric)
     base_layer_results_repo = BaseLayerResultsRepo(label_cols=label_cols, filepath=oof_path, load_from_file=True)
     module_logger.info('All available model_data:')
@@ -203,8 +207,8 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thres
     # ...
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols,
-                           5, 2018, auto_sub_func, metric=metric, metrics_callback=metrics_callback)
+        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 3, 2018, auto_sub_func,
+                           preds_save_path, metric=metric, metrics_callback=metrics_callback)
 
     base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
                                 layer2_cv_score, layer2_model_data_list)
