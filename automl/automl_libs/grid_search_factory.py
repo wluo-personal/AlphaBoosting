@@ -226,9 +226,10 @@ class XgbGS(GridSearch):
         eval_data_name = 'all_data'
         model = xgb.train(self.gs_params, xgb_all_data, evals=[(xgb_all_data, eval_data_name)], evals_result=evals_res,
                           num_boost_round=best_round, verbose_eval=int(0.2 * best_round))
+        # pdb.set_trace()  #TODO: KeyError: 'all_data' when "gs_models": "lgb|catb|xgb"
         train_alldata_metric = evals_res[eval_data_name][self.metric][-1]
         self.logger.info('Training done. Iteration: {} | train_{}: {:.5f}'
-                           .format(best_round, self.metric, train_alldata_metric))
+                         .format(best_round, self.metric, train_alldata_metric))
         del xgb_all_data;
         gc.collect()
         y_test_pred = model.predict(xgb_test)

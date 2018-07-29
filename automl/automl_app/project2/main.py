@@ -94,7 +94,7 @@ def params_gen(model='lgb'):
         }
     elif model == 'catb':
         params = {
-            'iterations': 50,
+            'iterations': 100,
             'depth': np.random.randint(6, 11),
             'l2_leaf_reg': np.random.randint(0, 31) / 10,
             #     'custom_metric': 'AUC',

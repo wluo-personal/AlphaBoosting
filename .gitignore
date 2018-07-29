@@ -11,6 +11,7 @@ val_index.json
 *.pyc
 *.pkl
 *.ftr
+*.swp
 
 # Experiment files
 exp_*

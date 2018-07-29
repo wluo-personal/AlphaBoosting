@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import os, json, gc, logging, shutil, pickle, time
-from automl_libs import utils, grid_search, grid_search_v2, nn_libs, stacknet
+from automl_libs import utils, grid_search, grid_search_v2, nn_libs
+from automl_libs import stacknet_v2 as stacknet
+# from automl_libs import stacknet
 from enum import Enum
 import pdb
 
@@ -38,7 +40,7 @@ class AlphaBoosting:
 
         self.OUTDIR = self.config_dict['project_root'] + 'output/'
         self.TEMP_DATADIR = self.config_dict['project_root'] + 'temp_data/'
-        self.run_record_url = self.OUTDIR + self.config_dict['last_run_record_filename']
+        self.run_record_url = self.TEMP_DATADIR + self.config_dict['last_run_record_filename']
         self.train_data_url = self.config_dict['train_data_url']
         self.test_data_url = self.config_dict['test_data_url']
         self.label = self.config_dict['label']
@@ -289,6 +291,7 @@ class AlphaBoosting:
                        stratified=self.config_dict['gs_cv_stratified'],
                        do_preds=gs_do_preds, X_test=X_test, y_test=y_test,
                        auto_sub_func=self.auto_sub_func,
+                       # auto_sub_func=None,
                        preds_save_path=self.OUTDIR+'gs_saved_preds/',
                        suppress_warning=gs_sup_warning)
         del train, val, test; gc.collect()
@@ -308,16 +311,22 @@ class AlphaBoosting:
         train = pd.concat([train, val])
         layers_to_built = self.config_dict['build_stacknet_layers']
         self.logger.info('layers to be built: {}'.format(layers_to_built))
+        _, seed = self.params_gen('lgb')  # does not matter lgb or any other, we just want a seed
         if 1 in layers_to_built:
             stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
+                            params_source=self.config_dict['params_source'],
+                            build_layer1_amount=self.config_dict['build_layer1_amount'],
                             params_gen=self.params_gen, layer1_models=self.config_dict['layer1_models'],
                             top_n_by=self.config_dict['top_n_by'],
                             top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1'],
-                            oof_nfolds=self.config_dict['oof_nfolds'], oof_path=oof_path,
-                            metric=self.config_dict['report_metric'], gs_result_path=gs_result_path)
+                            oof_nfolds=self.config_dict['oof_nfolds_layer1'], seed=seed, oof_path=oof_path,
+                            auto_sub_func=self.auto_sub_func, preds_save_path=self.OUTDIR+'sn_saved_preds/',
+                            pg_save_path=self.OUTDIR, metric=self.config_dict['report_metric'],
+                            gs_result_path=gs_result_path)
         if 2 in layers_to_built:
             stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
                             oof_path=oof_path, metric=self.config_dict['report_metric'],
+                            oof_nfolds=self.config_dict['oof_nfolds_layer2'], seed=seed,
                             layer1_thresh_or_chosen=self.config_dict['layer1_thresh_or_chosen_for_layer2'],
                             layer2_models=self.config_dict['layer2_models'], auto_sub_func=self.auto_sub_func,
                             preds_save_path=self.OUTDIR+'sn_saved_preds/')

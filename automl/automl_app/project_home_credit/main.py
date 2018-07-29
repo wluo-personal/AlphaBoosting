@@ -56,20 +56,21 @@ def params_gen(model='lgb'):
             'boosting': 'gbdt',
             'num_boost_round': 15000, # ignored in params. extract it and put it in input arguments in train or cv explicitly
                                    # seems to work fine as the upper limit when combined with early_stopping_round
-            'learning_rate': np.random.randint(3,20)/1000,
-#             'num_leaves': 50,
+            'learning_rate': np.random.randint(2,10)/1000,
+            'num_leaves': np.random.randint(30, 80),
             'num_threads': 15, # best speed: set to number of real cpu cores, which is vCPU/2
             'max_depth': np.random.randint(4,10), # no limit. This is used to deal with over-fitting when #data is small.
-            'min_split_gain': np.random.randint(2, 100)/1000,
-            'min_child_weight': np.random.randint(2, 50),
-            'feature_fraction': np.random.randint(10,30)/100,
+            'min_split_gain': np.random.randint(2, 60)/1000,
+            'min_child_weight': np.random.randint(2, 60),
+            'feature_fraction': np.random.randint(15,80)/100,
             'feature_fraction_seed': seed,
             'early_stopping_round':np.random.randint(150,300),
             'bagging_fraction': np.random.randint(70,91)/100, #Randomly select part of data
             'bagging_seed': seed,
-            'scale_pos_weight': np.random.randint(10,20)/10,
-            'lambda_l1': np.random.randint(1,10)/10,
-            'lambda_l2': np.random.randint(5,20)/10,
+            'scale_pos_weight': np.random.randint(10,50)/10,
+            'lambda_l1': np.random.randint(2,50)/100,
+            'lambda_l2': np.random.randint(5,30)/10,
+            'verbose_eval': 500,
             'metric': 'auc'
         }
     elif model == 'xgb':
@@ -94,8 +95,8 @@ def params_gen(model='lgb'):
         }
     elif model == 'catb':
         params = {
-            'iterations': 12000,
-            'depth': np.random.randint(4, 10),
+            'iterations': 8000,
+            'depth': np.random.randint(4, 9),
             'l2_leaf_reg': np.random.randint(0, 31) / 10,
             #     'custom_metric': 'AUC',
             'eval_metric': 'AUC',
@@ -135,7 +136,7 @@ def params_gen(model='lgb'):
             'lr_fin': 0.01,  # if == lr_init, then no lr decay
             'batch_size': 2048,
             "pred_batch_size": 50000,
-            'best_epoch': 4,
+            'best_epoch': 2,
             'patience': 1,
             'categorical_feature': [],
             'cat_emb_outdim': 50,   # could be a constant or a dict (col name:embed out dim). e.g.:
@@ -209,4 +210,4 @@ if __name__ == '__main__':
     logger_config.config(project_path + 'project.log', file_loglevel=logging.INFO)
     automl_config_file = project_path + 'automl_config.json'
     run_record_file_name = project_path + 'last_run_record.json'  # don't created this file
-    AlphaBoosting(automl_config_file, features_to_gen, params_gen, None)#kaggle_auto_sub)
+    AlphaBoosting(automl_config_file, features_to_gen, params_gen, None)  # kaggle_auto_sub)

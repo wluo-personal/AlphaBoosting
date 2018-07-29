@@ -9,6 +9,7 @@ import copy
 import sys
 import logging
 from automl_libs import SklearnBLE, NNBLE
+from automl_libs import utils
 module_logger = logging.getLogger(__name__)
 import pdb
 
@@ -210,7 +211,6 @@ def load_obj(name, filepath):
     with open(filepath + name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
-
 class BaseLayerResultsRepo:
     def __init__(self, label_cols, filepath, load_from_file):
         """
@@ -242,6 +242,32 @@ class BaseLayerResultsRepo:
             self._base_layer_est_scores = load_obj('models_base_layer_est_scores', self.filepath)
             self._status_report = load_obj('status_report', self.filepath)
 
+    def merge_another_repo(self, ext):
+        # make sure neither repo is empty
+        assert len(self.get_model_data_id_list()) > 0
+        assert len(ext.get_model_data_id_list()) > 0
+        # make sure label cols match
+        assert set(self._label_cols) - set(ext._label_cols) == set()
+        # make sure shape mataches
+        assert self._layer1_oof_train['label'][0].shape == ext._layer1_oof_train['label'][0].shape
+        assert self._layer1_oof_test['label'][0].shape == ext._layer1_oof_test['label'][0].shape
+        assert list(self._base_layer_est_preds.values())[0].shape == \
+               list(ext._base_layer_est_preds.values())[0].shape
+        already_in_self = list(set(ext.get_model_data_id_list()).intersection(set(self.get_model_data_id_list())))
+        for model_data_id in already_in_self:
+            ext.remove(model_data_id)
+        self.logger.info('Merge: {}'.format(ext.get_model_data_id_list()))
+        self.logger.info('Ignore: {}'.format(already_in_self))
+        print('Merge: {}'.format(ext.get_model_data_id_list()))
+        print('Ignore: {}'.format(already_in_self))
+        for label in self._label_cols:
+            self._layer1_oof_train[label].extend(ext._layer1_oof_train[label])
+            self._layer1_oof_test[label].extend(ext._layer1_oof_test[label])
+            self._model_data_id_list.extend(ext._model_data_id_list)
+            self._base_layer_est_preds.update(ext._base_layer_est_preds)
+            self._base_layer_est_scores.update(ext._base_layer_est_scores)
+            self._status_report.update(ext._status_report)
+
     def get_model_data_id_list(self):
         return self._model_data_id_list
     
@@ -272,6 +298,7 @@ class BaseLayerResultsRepo:
             self._layer1_oof_train[label] += layer1_oof_train[label]
             self._layer1_oof_test[label] += layer1_oof_test[label]
         for (model_data_id, cv_score) in layer1_cv_score.items():
+            self.add_score(model_data_id, cv_score)
             self.update_report(model_data_id, 'oof_cv_score', cv_score)
 
     def update_report(self, model_data_id, report_key, report_value):
@@ -279,6 +306,7 @@ class BaseLayerResultsRepo:
             raise ValueError('model_data_id is not found in the repo. function [add] needs '
                              'to be run first so that this model_data is in the repo')
         self._status_report[model_data_id][report_key] = report_value
+        self._status_report[model_data_id]['timestamp'] = utils.get_time()
         self.logger.info('StackNet report updated: {}: {} => {}'.format(model_data_id, report_key, report_value))
 
     def get_report(self, as_df=True):
@@ -418,6 +446,7 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         kf = KFold(n_splits=nfolds, shuffle=shuffle, random_state=seed)
 
     cv_score = 0
+    cv_train_score = 0
     for i, (tr_index, te_index) in enumerate(kf.split(x_train, y_train)):
         if isinstance(x_train, pd.DataFrame):  # if type(x_train).__name__ == 'DataFrame':
             x_tr, x_te = x_train.iloc[tr_index], x_train.iloc[te_index]
@@ -440,27 +469,34 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
             y_pred_of_the_fold = clf.predict('x_te')
             y_pred_of_test = clf.predict('x_test')
         else:
-            clf.train(x_tr, y_tr)
+            # pdb.set_trace()
+            val_metric, train_metric = clf.train(x_tr, y_tr, x_te, y_te)
+            if train_metric is not None:
+                cv_train_score += train_metric
+            # clf.train(x_tr, y_tr, x_te, y_te)
             y_pred_of_the_fold = clf.predict(x_te)
             y_pred_of_test = clf.predict(x_test)
 
         y_pred_of_the_fold = np.array(y_pred_of_the_fold).reshape(-1,)
         oof_train[te_index] = y_pred_of_the_fold
-        if metrics_callback is not None:
-            score = metrics_callback(y_te, y_pred_of_the_fold)
-            module_logger.info('metric of fold {}: {}'.format(i+1, score))
-            cv_score += score
+        # if metrics_callback is not None:
+        #     score = metrics_callback(y_te, y_pred_of_the_fold)
+        #     module_logger.info('metric of fold {}: {}'.format(i+1, score))
+        #     cv_score += score
 
         y_pred_of_test = np.array(y_pred_of_test).reshape(-1,)
         oof_test_kf[i, :] = y_pred_of_test
 
-    cv_score = cv_score / nfolds
-
     oof_test[:] = oof_test_kf.mean(axis=0)
-    return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1), cv_score#, oof_test_kf.reshape(-1, nfolds)
+    oof_train_score = metrics_callback(y_train, oof_train)
+    cv_score = oof_train_score  #cv_score / nfolds
+    cv_train_score = cv_train_score / nfolds
+    module_logger.info('oof is done. val cv: {:.5f} | train cv: {:.5f}'.format(cv_score, cv_train_score))
+    return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1), cv_score, cv_train_score#, oof_test_kf.reshape(-1, nfolds)
 
 
-def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_threshold=None, metrics_callback=None):
+def compute_layer1_oof(bldr, model_pool, label_cols, auto_sub_func, preds_save_path, nfolds=5, seed=2018,
+                       sfm_threshold=None, metrics_callback=None):
     """
     Params:
         bldr: an instance of BaseLayerDataRepo
@@ -475,7 +511,8 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
         layer1_est_preds: This is the prediction of the layer 1 model_data, you can submit it to see the LB score
         layer1_oof_train: This will be used as training features in higher layers (one from each model_data)
         layer1_oof_mean_test: This will be used as testing features in higher layers (one from each model_data)
-        layer1_cv_score: This is a list of cv scores (e.g. auc) of all layer 2 model_data
+        layer1_cv_score: This is a list of cv scores (e.g. auc) of all layer 1 model_data
+        layer1_cv_train_score: This is a list of cv train scores (e.g. auc) of all layer 1 model_data
         model_data_id_list: This is the list of all layer 1 model_data
     """
     layer1_est_preds = {} # directly preditions from the base layer estimators # also layer1_oof_nofold_test
@@ -483,6 +520,7 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
     layer1_oof_train = {}
     layer1_oof_mean_test = {}
     layer1_cv_score = {}
+    layer1_cv_train_score = {}  # not saved in stacknet repo. TO BE IMPLEMENTED if needed
     #layer1_oof_perfold_test = {}
     #layer1_oof_nofold_test = {}
 
@@ -523,22 +561,26 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
                 if 'PERLABEL' in str(model_name):
                     model.set_params_for_label(label)
 
-                if nfolds != 0:
-                    oof_train, oof_mean_test, cv_score = \
-                        get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
-                                stratified=True, seed=seed, metrics_callback=metrics_callback)
-                    module_logger.info('oof is done')
-                else:
+                if nfolds == 0:
                     raise ValueError('nfolds of oof can NOT be 0!')
+                oof_train, oof_mean_test, cv_score, cv_train_score = \
+                    get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
+                            stratified=True, seed=seed, metrics_callback=metrics_callback)
 
-                module_logger.info('Training using all data and gen prediction for submission...')
-                if type(model).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
-                    model.train(x_train, y_train, None, None, x_test)
-                    est_preds = model.predict('x_test')
-                else:
-                    model.train(x_train, y_train)
-                    est_preds = model.predict(x_test)
-                est_preds = np.array(est_preds).reshape(-1,)
+                _save_and_submit(preds_save_path, model_data_id, oof_mean_test, auto_sub_func)
+
+                # module_logger.info('Training using all data and gen prediction for submission...')
+                # if type(model).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
+                #     model.train(x_train, y_train, None, None, x_test)
+                #     est_preds = model.predict('x_test')
+                # else:
+                #     model.train(x_train, y_train)
+                #     est_preds = model.predict(x_test)
+                # est_preds = np.array(est_preds).reshape(-1,)
+                est_preds = np.array(oof_mean_test).reshape(-1,)
+                            # instead of training a model again, we use oof_mean_test as prediction.
+                            # oof train is a blend of $nfold models, it could be better than
+                            # a single model trained using all data
 
                 if label not in layer1_oof_train:
                     layer1_oof_train[label] = []
@@ -555,8 +597,9 @@ def compute_layer1_oof(bldr, model_pool, label_cols, nfolds=5, seed=2018, sfm_th
                     model_data_id_list.append(model_data_id)
                 layer1_est_preds[model_data_id][:,i] = est_preds
                 layer1_cv_score[model_data_id] = cv_score  # TODO: unlike others, here assuming one label
+                layer1_cv_train_score[model_data_id] = cv_train_score
 
-    return layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, model_data_id_list
+    return layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, layer1_cv_train_score, model_data_id_list
 
 
 def combine_layer_oof_per_label(layer1_oof_dict, label):
@@ -611,8 +654,8 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             x_train = combine_layer_oof_per_label(layer1_oof_train_loaded, label)
             x_test = combine_layer_oof_per_label(layer1_oof_test_loaded, label)
 
-            oof_train, oof_test, cv_score = get_oof(model,  x_train, train[label], x_test,
-                                                    nfolds, seed, metrics_callback=metrics_callback)
+            oof_train, oof_test, cv_score, cv_train_score \
+                = get_oof(model,  x_train, train[label], x_test, nfolds, seed, metrics_callback=metrics_callback)
 
             if label not in layer2_oof_train:
                 layer2_oof_train[label] = []
@@ -629,15 +672,8 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
                 est_preds = model.predict(x_test)
             est_preds = np.array(est_preds).reshape(-1, )
 
-            pred_npy_file = preds_save_path + '{}_preds'.format(model_id)
-            np.save(pred_npy_file, est_preds)
-            module_logger.info('StackNet layer2 predictions({}) saved in {}.'.format(model_id, preds_save_path))
-
-            if auto_sub_func is not None:
-                try:
-                    auto_sub_func(est_preds, model_id)
-                except:
-                    print('Auto Submission Failed: ', sys.exc_info()[0])
+            _save_and_submit(preds_save_path, model_id, est_preds, auto_sub_func)
+            _save_and_submit(preds_save_path, model_id+'_oof', np.array(oof_test).reshape(-1,), auto_sub_func)
 
             if model_id not in layer2_est_preds:
                 layer2_est_preds[model_id] = np.empty((x_test.shape[0], len(label_cols)))
@@ -646,3 +682,14 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             layer2_cv_score[model_id] = cv_score  # TODO: unlike others, here assuming one label
 
     return layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list
+
+
+def _save_and_submit(preds_save_path, pred_name, preds, auto_sub_func):
+    pred_npy_file = preds_save_path + '{}'.format(pred_name)
+    np.save(pred_npy_file, preds)
+    module_logger.info('StackNet predictions({}) saved in {}.'.format(pred_name, preds_save_path))
+    if auto_sub_func is not None:
+        try:
+            auto_sub_func(preds, pred_name)
+        except:
+            print('Auto Submission Failed: ', sys.exc_info()[0])

@@ -80,27 +80,8 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                         except:
                             print('Auto Submission Failed: ', sys.exc_info()[0])
 
-
-                # get the gs_res_dict ready for storage
-                gs_res_dict['data_name'] = data_name
-                gs_res_dict.pop('categorical_column', None)
-                gs_res_dict.pop('verbose', None)
-                # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
-                for k, v in gs_res_dict.items():
-                    if isinstance(v, list):
-                        gs_res_dict[k] = '"'+str(v)+'"'
-                        #module_logger.debug(gs_res_dict[k])
-
-                res = pd.DataFrame(gs_res_dict, index=[run_id])
-                filename_for_gs_results = gs_record_dir + '{}_{}_grid_search.csv'.format(gs_model, data_name)
-                if not os.path.exists(filename_for_gs_results):
-                    res.to_csv(filename_for_gs_results)
-                    module_logger.debug(filename_for_gs_results + ' created')
-                else:
-                    old_res = pd.read_csv(filename_for_gs_results, index_col='Unnamed: 0')
-                    res = pd.concat([old_res, res])
-                    res.to_csv(filename_for_gs_results)
-                    module_logger.info(filename_for_gs_results + ' updated')
+                utils.save_params_and_result(run_id, gs_model, data_name, 'grid_search', gs_res_dict,
+                                             ['categorical_column','verbose'], gs_record_dir)
 
             except Exception as e:
                 if 'ResourceExhaustedError' in str(type(e)): # can't catch this error directly...
@@ -108,3 +89,5 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                     continue
                 else:
                     raise  # throw the exception
+
+

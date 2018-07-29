@@ -7,6 +7,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import cross_val_score
+from sklearn.metrics import roc_auc_score
 from scipy.sparse import csr_matrix, hstack, vstack
 from keras.layers import Dense, Embedding, Input, LSTM, GRU, Bidirectional, \
     GlobalMaxPool1D, Dropout, BatchNormalization
@@ -15,6 +16,7 @@ from keras.models import Model
 import lightgbm as lgb
 import xgboost as xgb
 import catboost as catb
+import gc
 from automl_libs import nn_libs
 import logging
 module_logger = logging.getLogger(__name__)
@@ -77,11 +79,12 @@ class SklearnBLE(BaseLayerEstimator):
         self.params['random_state'] = self._seed
         self._init_model()
 
-    def train(self, x, y):
+    def train(self, x, y, x_val=None, y_val=None):
         if self._nb:
             self._r = self._calculate_nb(x, y.values)
             x = x.multiply(self._r)
         self.model.fit(x, y)
+        return None, None
 
     def cv(self, x, y, nfolds=5, scoring=None):
         """
@@ -113,8 +116,13 @@ class LightgbmBLE(BaseLayerEstimator):
         self._nb = nb
         self._seed = seed
         self._categorical_feature = params.pop('categorical_feature', 'auto')
-        self._num_boost_round = params.pop('best_round', 100)
-        self._verbose_eval = params.pop('verbose_eval', 1)
+        self._early_stopping_round = params.pop('early_stopping_round', None)
+        if self._early_stopping_round is None:
+            self._num_boost_round = params['best_round']  # from gs result csv
+        else:
+            self._num_boost_round = params['num_boost_round']  # from params_gen
+        self._verbose_eval = params.pop('verbose_eval', int(self._num_boost_round/10))
+        self._metric = params['metric']
         self._train_params = params
         self._model = None
         self._r = None
@@ -127,17 +135,22 @@ class LightgbmBLE(BaseLayerEstimator):
     #     self.params = params
     #     self._train_params['data_random_seed'] = self._seed
 
-    def train(self, x, y, valid_set_percent=0):
+    def train(self, x, y, x_val=None, y_val=None, valid_set_percent=0):
         """
-        Params:
-            x: np/scipy/ 2-d array or matrix
-            y: pandas series
-            valid_set_percent: (float, 0 to 1).
+        :param x: np/scipy/ 2-d array or matrix
+        :param y: pandas series
+        :param x_val: useful if using early stopping
+        :param y_val: useful if using early stopping
+        :param valid_set_percent: (float, 0 to 1).
                     0: no validation set. (imposible to use early stopping)
                     1: use training set as validation set (to check underfitting, and early stopping)
                     >0 and <1: use a portion of training set as validation set. (to check overfitting, and early stopping)
-
+        :return:
+            val_metric (could be None)
+            train_metric (could be None)
         """
+        val_metric = None
+        train_metric = None
         if self._nb:
             self._r = self._calculate_nb(x, y.values)
             x = x.multiply(self._r)
@@ -160,20 +173,31 @@ class LightgbmBLE(BaseLayerEstimator):
                 self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_val,
                                         num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
         else:
-            self.logger.info('No evaluation set, thus not possible to use early stopping. '
-                             'Please train with your best params.')
-            self._model = lgb.train(self._train_params, train_set=lgb_train, valid_sets=lgb_train,
-                                    num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
+            if self._early_stopping_round is not None and x_val is not None and y_val is not None:
+                lgb_val = lgb.Dataset(x_val, y_val, categorical_feature=self._categorical_feature)
+                self.logger.info('Val data found, will use early stopping.')
+                self._model = lgb.train(self._train_params, train_set=lgb_train, valid_sets=[lgb_train, lgb_val],
+                                        num_boost_round=self._num_boost_round,
+                                        early_stopping_rounds=self._early_stopping_round,
+                                        verbose_eval=self._verbose_eval)
+                del lgb_train, lgb_val; gc.collect()
+                best_round = self._model.best_iteration
+                val_metric = self._model.best_score['valid_1'][self._metric]
+                train_metric = self._model.best_score['training'][self._metric]
+                self.logger.info('Training Done. Best round: {}. val_{}: {:.5f} | train_{}: {:.5f}'
+                                 .format(best_round, self._metric, val_metric, self._metric, train_metric))
+            else:
+                self.logger.info('Val data NOT found, thus not possible to use early stopping. '
+                                 'Please train with your best params.')
+                self._model = lgb.train(self._train_params, train_set=lgb_train, valid_sets=lgb_train,
+                                        num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
+                del lgb_train; gc.collect()
+        return val_metric, train_metric
 
     def predict(self, x):
         if self._nb:
             x = x.multiply(self._r)
-        if self._model.best_iteration > 0:
-            self.logger.info('best_iteration {} is chosen.'.format(self._model.best_iteration))
-            result = self._model.predict(x, num_iteration=self._model.best_iteration)
-        else:
-            result = self._model.predict(x)
-        return result
+        return self._model.predict(x)
 
     @property
     def model_(self):
@@ -194,22 +218,46 @@ class CatBoostBLE(BaseLayerEstimator):
     def __init__(self, params={}, seed=0):
         self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self._categorical_feature = params.pop('categorical_feature', None)
-        self._verbose_eval = params.pop('verbose_eval', 1)
+        self._verbose_eval = params.pop('verbose_eval', None)
+        self._best_model_flag = params.pop('use_best_model', None)
+        if self._verbose_eval is None:
+            self._verbose_eval = int(params['iterations']/30)
         self._model = catb.CatBoostClassifier(**params)
+        self._params = params
 
-    def train(self, x, y):
+    def train(self, x, y, x_val, y_val):
         """
         Params:
             x: np/scipy/ 2-d array or matrix
             y: pandas series
         """
+        val_metric, train_metric = None, None
         categorical_features_indices = None
         if self._categorical_feature is not None:
             categorical_features_indices = [x.columns.tolist().index(col) for col in self._categorical_feature]
-        self.logger.info('No evaluation set, thus not possible to use early stopping. '
-                         'Please train with your best params.')
-        self._model.fit(x, y, eval_set=(x, y), verbose_eval=self._verbose_eval,
+        if self._best_model_flag is not None:
+            if self._best_model_flag:
+                self.logger.info('use_best_model is True.')
+            else:
+                self.logger.info('No evaluation set, thus not possible to use best model. '
+                                 'Please train with your best params.')
+        if x_val is not None and y_val is not None:
+            eval_set = [(x_val, y_val), (x, y)]
+        else:
+            eval_set = (x, y)
+        self._model.fit(x, y, eval_set=eval_set, verbose_eval=self._verbose_eval,
                         cat_features=categorical_features_indices)
+        if x_val is not None and y_val is not None:
+            val_metric = roc_auc_score(y_val, self._model.get_test_evals()[0][0])
+            train_metric = roc_auc_score(y, self._model.get_test_evals()[1][0])
+        else:
+            train_metric = roc_auc_score(self.y, self._model.get_test_evals()[0][0])
+        self._params['iterations'] = self._model.tree_count_
+        self.logger.info('Iter: {}. val_auc: {} | train_auc: {}'
+                         .format(self._params['iterations'],
+                                 val_metric if val_metric is not None else -1,
+                                 train_metric))
+        return val_metric, train_metric
 
     def predict(self, x):
         result = self._model.predict_proba(x)[:, 1]
@@ -227,22 +275,44 @@ class XgboostBLE(BaseLayerEstimator):
     def __init__(self, params={}, seed=0):
         self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self._seed = seed
-        self._num_boost_round = params.pop('best_round', 100)
+        self._early_stopping_round = params.pop('early_stopping_rounds', None)
+        if self._early_stopping_round is None:
+            self._num_boost_round = params['best_round']  # from gs result csv
+        else:
+            self._num_boost_round = params['num_boost_round']  # from params_gen
+        self._metric = params['eval_metric']
         self._verbose_eval = params.pop('verbose_eval', 1)
         self._train_params = params
         self._model = None
 
-    def train(self, x, y):
+    def train(self, x, y, x_val, y_val):
         """
         Params:
             x: np/scipy/ 2-d array or matrix
             y: pandas series
         """
+        val_metric, train_metric = None, None
         xgb_train = xgb.DMatrix(x, y)
-        self.logger.info('No evaluation set, thus not possible to use early stopping. '
-                         'Please train with your best params.')
-        self._model = xgb.train(self._train_params, xgb_train, evals=[(xgb_train, 'train')],
-                                num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
+        if self._early_stopping_round is not None and x_val is not None and y_val is not None:
+            xgb_val = xgb.DMatrix(x_val, y_val)
+            self.logger.info('Val data found, will use early stopping.')
+            evals_res = {}
+            self._model = xgb.train(self._train_params, xgb_train, num_boost_round=self._num_boost_round,
+                                    early_stopping_rounds=self._early_stopping_round,
+                                    evals=[(xgb_val, 'val'),(xgb_train, 'train')], evals_result=evals_res,
+                                    verbose_eval=self._verbose_eval)
+            del xgb_train, xgb_val; gc.collect()
+            best_round = self._model.best_iteration
+            val_metric = evals_res['val'][self._metric][-1]
+            train_metric = evals_res['train'][self._metric][-1]
+            self.logger.info('Training Done. Best round: {}. val_{}: {:.5f} | train_{}: {:.5f}'
+                             .format(best_round, self._metric, val_metric, self._metric, train_metric))
+        else:
+            self.logger.info('No evaluation set, thus not possible to use early stopping. '
+                             'Please train with your best params.')
+            self._model = xgb.train(self._train_params, xgb_train, evals=[(xgb_train, 'train')],
+                                    num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
+        return val_metric, train_metric
 
     def predict(self, x):
         xgb_test = xgb.DMatrix(x)

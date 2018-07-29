@@ -14,9 +14,9 @@ import ast
 import logging, gc
 module_logger = logging.getLogger(__name__)
 
-
-def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, params_gen,
-           layer1_models, top_n_gs, top_n_by, oof_nfolds, oof_path, metric, gs_result_path=''):
+def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, params_source,
+           params_gen, layer1_models, top_n_gs, top_n_by, oof_nfolds, oof_path, metric, auto_sub_func,
+           preds_save_path, gs_result_path=''):
     """
     :param data_name: data name. e.g. 'ordinal', 'one_hot', etc
     :param train: DataFrame with label
@@ -33,6 +33,8 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
     :param gs_result_path: path to load grid search result
     :return: None
     """
+    if not os.path.exists(preds_save_path):
+        os.makedirs(preds_save_path)
     X_train = train[feature_cols]  # still df
     y_train = train[label_cols]  # make sure it's df
     X_test = test[feature_cols] # still df
@@ -106,7 +108,7 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                         model_params = {}
                         for key in keys_in_original_params:
                             model_params[key] = params[key]
-                        model_params['iterations'] = params['best_round']
+                        # model_params['iterations'] = params['best_round']
                         print(model_params)
                         model_params['categorical_feature'] = categorical_cols
                         model_params['verbose_eval'] = int(params['iterations'] / 10)
@@ -124,8 +126,8 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                     # might need hours of finish computing oof, we want to save it
                     # once it's done)
                     layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, model_data_id_list = \
-                        compute_layer1_oof(bldr, model_pool, label_cols, nfolds=oof_nfolds,
-                                           sfm_threshold=None, metrics_callback=metrics_callback)
+                            compute_layer1_oof(bldr, model_pool, label_cols, auto_sub_func, preds_save_path,
+                                               nfolds=oof_nfolds, sfm_threshold=None, metrics_callback=metrics_callback)
 
                     base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds,
                                                 layer1_cv_score, model_data_id_list)

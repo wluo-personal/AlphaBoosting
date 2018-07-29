@@ -1,6 +1,8 @@
 import numpy as np
+import pandas as pd
 import random
 import string
+import os
 import logging
 module_logger = logging.getLogger(__name__)
 
@@ -73,3 +75,36 @@ def get_time(timezone='America/New_York', time_format='%Y-%m-%d %H:%M:%S'):
 
 def get_random_string(length=4):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
+
+
+def save_params_and_result(run_id, model_name, data_name, gs_sn_flag, param_res_dict, keys_to_be_popped, save_dir):
+    """
+    :param run_id: (str) unique id for the current grid search or stacknet run. (e.g. 3fzG)
+    :param model_name: (str) lgb, catb, xgb, nn, etc..
+    :param data_name: (str) e.g. w2v_newcat
+    :param gs_sn_flag: (str) either "gridsearch" or "stacknet"
+    :param param_res_dict: (dict) combined parameters and grid search / stacknet results (metrics)
+    :param keys_to_be_popped: (list of str) keys to be popped out the param_res_dict
+    :param save_dir: (str) directory to save the param_res_dict as Dataframe
+    :return: None
+    """
+    param_res_dict['data_name'] = data_name
+    # get the param_res_dict ready for storage
+    for key in keys_to_be_popped:
+        param_res_dict.pop(key, None)
+    # so that [1,2,3] can be converted to "[1,2,3]" and be treated as a whole in csv
+    for k, v in param_res_dict.items():
+        if isinstance(v, list):
+            param_res_dict[k] = '"' + str(v) + '"'
+            # module_logger.debug(param_res_dict[k])
+
+    res = pd.DataFrame(param_res_dict, index=[run_id])
+    filename_for_gs_results = save_dir + '{}_{}_{}.csv'.format(model_name, data_name, gs_sn_flag)
+    if not os.path.exists(filename_for_gs_results):
+        res.to_csv(filename_for_gs_results)
+        module_logger.debug(filename_for_gs_results + ' created')
+    else:
+        old_res = pd.read_csv(filename_for_gs_results, index_col='Unnamed: 0')
+        res = pd.concat([old_res, res])
+        res.to_csv(filename_for_gs_results)
+        module_logger.info(filename_for_gs_results + ' updated')

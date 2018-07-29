@@ -29,8 +29,8 @@
     "gs_suppress_warning": true,
 
     "do_stacknet": true,
-    "params_source": "gs",
-    "build_stacknet_layers": [2],
+    "params_source": "pg",
+    "build_stacknet_layers": [1,2],
     "build_layer1_amount": 1,
     "oof_nfolds_layer1": 2,
     "oof_nfolds_layer2": 3,
