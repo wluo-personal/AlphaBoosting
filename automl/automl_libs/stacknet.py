@@ -1,6 +1,6 @@
 from automl_libs import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
 from automl_libs import SklearnBLE, LightgbmBLE, NNBLE, XgboostBLE, CatBoostBLE
-from automl_libs import compute_layer1_oof, compute_layer2_oof
+from automl_libs import compute_layer1_oof, compute_layer2andmore_oof
 from automl_libs import utils
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -209,8 +209,8 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, metric, layer1_thres
     # ...
 
     layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, 3, 2018, auto_sub_func,
-                           preds_save_path, metric=metric, metrics_callback=metrics_callback)
+        compute_layer2andmore_oof(model_pool, layer2_inputs, train, label_cols, 3, 2018, auto_sub_func,
+                                  preds_save_path, metric=metric, metrics_callback=metrics_callback)
 
     base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
                                 layer2_cv_score, layer2_model_data_list)

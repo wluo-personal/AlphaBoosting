@@ -2,8 +2,8 @@
     "project_root": "./",
     "last_run_record_filename": "last_run_record.json",
     "data_name": "bo2_newcat_80pnull",
-    "train_data_url": "data/train_bo2_newcat_80pnullremove.pkl",
-    "test_data_url": "data/test_bo2_newcat_80pnullremove.pkl",
+    "train_data_url": "/home/kai/data/shiyi/data/home_credit/train_bo2_newcat_80pnullremove.pkl",
+    "test_data_url": "/home/kai/data/shiyi/data/home_credit/test_bo2_newcat_80pnullremove.pkl",
     "test_label_url": null,
     "down_sampling_amt": 0,
     "down_sampling_ratio": null, 
@@ -30,7 +30,7 @@
 
     "do_stacknet": true,
     "report_metric": "auc",
-    "build_stacknet_layers": [3],
+    "build_stacknet_layers": [2],
 
     "__layer1config__": "#### layer1config ####",
     "layer1_models": ["lgb","catb","xgb"],
@@ -41,9 +41,9 @@
     "top_n_by__gs": "auc",
 
     "__layer2config__": "#### layer2config ####",
-    "layer1_thresh_or_chosen_for_layer2": [["oFsf__XGB_bo2_w2v_newcat_layer1", "1CKg__LGB_flight_data_ordinal_layer1", "dQTL__LGB_flight_data_ordinal_layer1", "pC2i__LGB_flight_data_ordinal_layer1", "f4XK__XGB_bo2_w2v_newcat_layer1", "KnJq__XGB_onehot_layer1", "x26K__XGB_onehot_layer1", "zTty__CATB_bo2_newcat_80pnull_layer1", "HyEX__LGB_fe_repro_1_layer1", "sFig__LGB_fe_repro_1_layer1", "ksIj__LGB_flight_data_ordinal_layer1", "OuFu__XGB_bo2_w2v_newcat_layer1", "3VXI__LGB_flight_data_ordinal_layer1", "9QmW__LGB_flight_data_ordinal_layer1", "VK0U__XGB_onehot_layer1", "6Keg__XGB_onehot_layer1", "Ro9e__XGB_onehot_layer1", "pVfN__LGB_fe_repro_1_layer1", "uvRx__LGB_fe_repro_1_layer1"]],
+    "layer1_thresh_or_chosen_for_layer2": [["VK0U__XGB_onehot_layer1", "6Keg__XGB_onehot_layer1", "KnJq__XGB_onehot_layer1", "ksIj__LGB_flight_data_ordinal_layer1", "1CKg__LGB_flight_data_ordinal_layer1", "dQTL__LGB_flight_data_ordinal_layer1", "oFsf__XGB_bo2_w2v_newcat_layer1", "OuFu__XGB_bo2_w2v_newcat_layer1", "f4XK__XGB_bo2_w2v_newcat_layer1", "pVfN__LGB_fe_repro_1_layer1", "uvRx__LGB_fe_repro_1_layer1", "HyEX__LGB_fe_repro_1_layer1", "OuFu__XGB_bo2_w2v_newcat_layer1", "vYhU__CATB_bo2_newcat_80pnull_layer1", "xa2m__LGB_simple_feats_layer1", "bQFq__LGB_simple_feats_layer1"]],
     "oof_nfolds_layer2": 3,
-    "layer2_models": ["xgb"],
+    "layer2_models": ["logreg","lgb","xgb","nn"],
 
     "__layer3config__": "#### layer3config ####",
     "layer2_thresh_or_chosen_for_layer3": [["PbPy__NN_layer2","laux__NN_layer2","WpBG__XGB_layer2","4Kor__LGB_layer2"]],

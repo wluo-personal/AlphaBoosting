@@ -312,24 +312,38 @@ class AlphaBoosting:
         layers_to_built = self.config_dict['build_stacknet_layers']
         self.logger.info('layers to be built: {}'.format(layers_to_built))
         _, seed = self.params_gen('lgb')  # does not matter lgb or any other, we just want a seed
-        if 1 in layers_to_built:
-            stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
-                            params_source=self.config_dict['params_source'],
-                            build_layer1_amount=self.config_dict['build_layer1_amount'],
-                            params_gen=self.params_gen, layer1_models=self.config_dict['layer1_models'],
-                            top_n_by=self.config_dict['top_n_by'],
-                            top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1'],
-                            oof_nfolds=self.config_dict['oof_nfolds_layer1'], seed=seed, oof_path=oof_path,
-                            auto_sub_func=self.auto_sub_func, preds_save_path=self.OUTDIR+'sn_saved_preds/',
-                            pg_save_path=self.OUTDIR, metric=self.config_dict['report_metric'],
-                            gs_result_path=gs_result_path)
-        if 2 in layers_to_built:
-            stacknet.layer2(train, y_test, label_cols, params_gen=self.params_gen,
-                            oof_path=oof_path, metric=self.config_dict['report_metric'],
-                            oof_nfolds=self.config_dict['oof_nfolds_layer2'], seed=seed,
-                            layer1_thresh_or_chosen=self.config_dict['layer1_thresh_or_chosen_for_layer2'],
-                            layer2_models=self.config_dict['layer2_models'], auto_sub_func=self.auto_sub_func,
-                            preds_save_path=self.OUTDIR+'sn_saved_preds/')
+        layer2_counter = 0
+        layer3_counter = 0
+        for layer in layers_to_built:
+            if layer == 1:
+                stacknet.layer1(data_name, train, test, y_test, categorical_features, feature_cols, label_cols,
+                                params_source=self.config_dict['params_source'],
+                                build_layer1_amount=self.config_dict['build_layer1_amount__pg'],
+                                params_gen=self.params_gen, layer1_models=self.config_dict['layer1_models'],
+                                top_n_by=self.config_dict['top_n_by__gs'],
+                                top_n_gs=self.config_dict['top_n_per_gs_res_for_layer1__gs'],
+                                oof_nfolds=self.config_dict['oof_nfolds_layer1'], seed=seed, oof_path=oof_path,
+                                auto_sub_func=self.auto_sub_func, preds_save_path=self.OUTDIR+'sn_saved_preds/',
+                                pg_save_path=self.OUTDIR, metric=self.config_dict['report_metric'],
+                                gs_result_path=gs_result_path)
+            elif layer == 2:
+                stacknet.layer2andmore(train, y_test, label_cols, params_gen=self.params_gen,
+                                       oof_path=oof_path, metric=self.config_dict['report_metric'],
+                                       oof_nfolds=self.config_dict['oof_nfolds_layer2'], seed=seed,
+                                       layer1_thresh_or_chosen=
+                                       self.config_dict['layer1_thresh_or_chosen_for_layer2'][layer2_counter],
+                                       layer='layer2', layer2andmore_models=self.config_dict['layer2_models'],
+                                       auto_sub_func=self.auto_sub_func, preds_save_path=self.OUTDIR+'sn_saved_preds/')
+                layer2_counter += 1
+            elif layer == 3:
+                stacknet.layer2andmore(train, y_test, label_cols, params_gen=self.params_gen,
+                                       oof_path=oof_path, metric=self.config_dict['report_metric'],
+                                       oof_nfolds=self.config_dict['oof_nfolds_layer3'], seed=seed,
+                                       layer1_thresh_or_chosen=
+                                       self.config_dict['layer2_thresh_or_chosen_for_layer3'][layer3_counter],
+                                       layer='layer3', layer2andmore_models=self.config_dict['layer3_models'],
+                                       auto_sub_func=self.auto_sub_func, preds_save_path=self.OUTDIR+'sn_saved_preds/')
+                layer3_counter += 1
 
         # self._renew_status(to_do_dict, self.Stage.STACKNET.name, self.TEMP_DATADIR + 'todo_list.json')
 

@@ -1,9 +1,13 @@
 from automl_libs import BaseLayerDataRepo, BaseLayerResultsRepo, ModelName
 from automl_libs import SklearnBLE, LightgbmBLE, NNBLE, XgboostBLE, CatBoostBLE
-from automl_libs import compute_layer1_oof, compute_layer2_oof
+from automl_libs import compute_layer1_oof, compute_layer2andmore_oof
 from automl_libs import utils
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import ExtraTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
+from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
 from sklearn.metrics import roc_auc_score
 import pandas as pd
 from os import listdir
@@ -225,9 +229,10 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                                                  ['categorical_column', 'verbose'], pg_save_path)
 
 
-def layer2(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, seed, metric, layer1_thresh_or_chosen, layer2_models,
-           auto_sub_func, preds_save_path):
+def layer2andmore(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, seed, metric, layer1_thresh_or_chosen,
+                  layer, layer2andmore_models, auto_sub_func, preds_save_path):
     """
+    :param layer: str. 'layer2', 'layer3', etc..
     :param train: DataFrame with label
     :param y_test: array-like. In Kaggle, we don't know it.
     :param label_cols: list of column names (multi-classes or single-class)
@@ -236,7 +241,7 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, seed, me
     :param oof_path: path of save and load oof
     :param metric: usually 'auc'.
     :param layer1_thresh_or_chosen: either float (0,1) as threshold, or list of chosen model_data
-    :param layer2_models: currently support models: logreg, nn
+    :param layer2andmore_models: currently support models: logreg, nn
     :return: None
     """
     if not os.path.exists(preds_save_path):
@@ -247,8 +252,8 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, seed, me
     module_logger.info('All available model_data:')
     module_logger.info(base_layer_results_repo.show_scores())
     model_pool = {}
-    layer2_inputs = {}
-    layer2_chosen_model_data = {}
+    layer2andmore_inputs = {}
+    layer2andmore_chosen_model_data = {}
 
     if isinstance(layer1_thresh_or_chosen, float) and 0 < layer1_thresh_or_chosen < 1:
         chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds, chosen_model_data_list = \
@@ -260,20 +265,36 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, seed, me
         raise ValueError('layer1_thresh_or_chosen has unacceptable type {}. please pass in a float(0,1) or a list'
                          .format(type(layer1_thresh_or_chosen)))
 
-    for layer2_model in layer2_models:
-        if layer2_model == 'logreg':
+    for layer2andmore_model in layer2andmore_models:
+        if layer2andmore_model == 'logreg':
             model_id = utils.get_random_string()
             model_name = model_id+'__'+ModelName.LOGREG.name
             model_pool[model_name] = SklearnBLE(LogisticRegression)
-        elif layer2_model == 'nn':
+        elif layer2andmore_model == 'et':
+            model_id = utils.get_random_string()
+            model_name = model_id+'__'+ModelName.ET.name
+            model_pool[model_name] = SklearnBLE(ExtraTreeClassifier)
+        elif layer2andmore_model == 'rf':
+            model_id = utils.get_random_string()
+            model_name = model_id+'__'+ModelName.RF.name
+            model_pool[model_name] = SklearnBLE(RandomForestClassifier)
+        elif layer2andmore_model == 'lgb':
+            model_id = utils.get_random_string()
+            model_name = model_id+'__'+ModelName.LGB.name
+            model_pool[model_name] = SklearnBLE(clf=LGBMClassifier, params={'n_jobs': 4})
+        elif layer2andmore_model == 'xgb':
+            model_id = utils.get_random_string()
+            model_name = model_id+'__'+ModelName.XGB.name
+            model_pool[model_name] = SklearnBLE(clf=XGBClassifier, params={'n_jobs': 4})
+        elif layer2andmore_model == 'nn':
             model_id = utils.get_random_string()
             nn_model_param, _ = params_gen('stacknet_layer2_nn')
             model_name = model_id+'__'+ModelName.NN.name
             model_pool[model_name] = NNBLE(params=nn_model_param)
         else:
-            raise ValueError('{} is not supported in layer2'.format(layer2_model))
-        layer2_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
-        layer2_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
+            raise ValueError('{} is not supported in layer2andmore'.format(layer2andmore_model))
+        layer2andmore_inputs[model_name] = chosen_layer_oof_train, chosen_layer_oof_test, chosen_layer_est_preds
+        layer2andmore_chosen_model_data[model_id] = ' | '.join(['_'.join(name.split('_')[:3]) for name in chosen_model_data_list])
 
     # decision tree: bad performance
     # ...
@@ -281,21 +302,22 @@ def layer2(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, seed, me
     # ...
 
 
-    layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list = \
-        compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, oof_nfolds, seed, auto_sub_func,
-                           preds_save_path, metric=metric, metrics_callback=metrics_callback)
+    layer2andmore_est_preds, layer2andmore_oof_train, layer2andmore_oof_test, layer2andmore_cv_score, \
+    layer2andmore_model_data_list = compute_layer2andmore_oof(
+        model_pool, layer, layer2andmore_inputs, train, label_cols, oof_nfolds, seed, auto_sub_func,
+        preds_save_path, metric=metric, metrics_callback=metrics_callback)
 
-    base_layer_results_repo.add(layer2_oof_train, layer2_oof_test, layer2_est_preds,
-                                layer2_cv_score, layer2_model_data_list)
+    base_layer_results_repo.add(layer2andmore_oof_train, layer2andmore_oof_test, layer2andmore_est_preds,
+                                layer2andmore_cv_score, layer2andmore_model_data_list)
 
-    for model_data in layer2_model_data_list:
+    for model_data in layer2andmore_model_data_list:
         model_id = model_data.split('__')[0]
-        base_layer_results_repo.add_score(model_data, layer2_cv_score[model_data])
-        base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2_chosen_model_data[model_id])
+        base_layer_results_repo.add_score(model_data, layer2andmore_cv_score[model_data])
+        base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2andmore_chosen_model_data[model_id])
         base_layer_results_repo.update_report(model_data, 'nfolds', oof_nfolds)
 
     if y_test is not None:
-        for k, v in layer2_est_preds.items():
+        for k, v in layer2andmore_est_preds.items():
             base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
 
     base_layer_results_repo.save()

@@ -29,19 +29,28 @@
     "gs_suppress_warning": true,
 
     "do_stacknet": true,
-    "params_source": "gs",
-    "build_stacknet_layers": [2],
-    "build_layer1_amount": 1,
-    "oof_nfolds_layer1": 2,
-    "oof_nfolds_layer2": 3,
-    "layer1_models": ["lgb","catb","xgb"],
-    "top_n_per_gs_res_for_layer1": 3,
-    "top_n_by": "auc",
     "report_metric": "auc",
-    "layer1_thresh_or_chosen_for_layer2": 0.5,
-    "layer2_models": ["logreg", "nn"],
+    "build_stacknet_layers": [2,2,3],
 
-    "_comments": {
+    "__layer1config__": "#### layer1config ####",
+    "layer1_models": ["lgb","catb","xgb"],
+    "oof_nfolds_layer1": 2,
+    "params_source": "gs",
+    "build_layer1_amount__pg": 1,
+    "top_n_per_gs_res_for_layer1__gs": 3,
+    "top_n_by__gs": "auc",
+
+    "__layer2config__": "#### layer2config ####",
+    "layer1_thresh_or_chosen_for_layer2": [0.5, ["S2oN__LGB_ordinal2_layer1","wlfr__LGB_ordinal2_layer1"]],
+    "oof_nfolds_layer2": 3,
+    "layer2_models": ["logreg"],
+
+    "__layer3config__": "#### layer3config ####",
+    "layer2_thresh_or_chosen_for_layer3": [0.7],
+    "oof_nfolds_layer3": 3,
+    "layer3_models": ["logreg"],
+
+    "__comments__": {
         "validation": "validation_index overrules validation_ratio",
         "validation_ratio" : "range(exclusive): (0,1)",
         "down_sampling_amt": [

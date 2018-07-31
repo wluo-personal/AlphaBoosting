@@ -243,14 +243,17 @@ class BaseLayerResultsRepo:
             self._status_report = load_obj('status_report', self.filepath)
 
     def merge_another_repo(self, ext):
+        # only support when there is only one label in label cols (not really)
+        # assert len(self._label_cols) == 1
         # make sure neither repo is empty
         assert len(self.get_model_data_id_list()) > 0
         assert len(ext.get_model_data_id_list()) > 0
         # make sure label cols match
         assert set(self._label_cols) - set(ext._label_cols) == set()
         # make sure shape mataches
-        assert self._layer1_oof_train['label'][0].shape == ext._layer1_oof_train['label'][0].shape
-        assert self._layer1_oof_test['label'][0].shape == ext._layer1_oof_test['label'][0].shape
+        label = self._label_cols[0]
+        assert self._layer1_oof_train[label][0].shape == ext._layer1_oof_train[label][0].shape
+        assert self._layer1_oof_test[label][0].shape == ext._layer1_oof_test[label][0].shape
         assert list(self._base_layer_est_preds.values())[0].shape == \
                list(ext._base_layer_est_preds.values())[0].shape
         already_in_self = list(set(ext.get_model_data_id_list()).intersection(set(self.get_model_data_id_list())))
@@ -384,7 +387,7 @@ class BaseLayerResultsRepo:
             r2 = self._layer1_oof_test
             r3 = self._base_layer_est_preds
             r4 = self._model_data_id_list
-            self.logger.info('chosen for layer2: {}'.format(r4))
+            self.logger.info('chosen model_data: {}'.format(r4))
 
             self._layer1_oof_train = layer1_oof_train_temp
             self._layer1_oof_test = layer1_oof_test_temp
@@ -616,40 +619,41 @@ def combine_layer_oof_per_label(layer1_oof_dict, label):
     return x
 
 
-def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, seed, auto_sub_func,
-                       preds_save_path, metric, metrics_callback=None):
+def compute_layer2andmore_oof(model_pool, layer, layer_inputs, train, label_cols, nfolds, seed, auto_sub_func,
+                              preds_save_path, metric, metrics_callback=None):
     """
     Params:
         model_pool: dict. key: an option from ModelName. value: A model
-        layer2_inputs: dict. key: an option from ModelName. value: chosen results from an instance of BaseLayerDataRepo
+        layer: str. 'layer2', 'layer3', etc..
+        layer_inputs: dict. key: an option from ModelName. value: chosen results from an instance of BaseLayerDataRepo
         train: pd. training data is required here to extract labels from it. For now, please make sure the train is not shuffled
             (TODO: THIS SHOULD BE INCLUDED IN layer2_inputs, which in terms should be included in BaseLayerDataRepo.)
         label_cols: list. names of labels
         nfolds: int
         seed: int. for reproduce purpose
     Returns:
-        layer2_est_preds: This is the prediction of the layer 2 model_data, you can submit it to see the LB score
-        layer2_oof_train: This will be used as training features in higher layers (one from each model_data)
-        layer2_oof_mean_test: This will be used as testing features in higher layers (one from each model_data)
-        layer2_cv_score: This is a list of cv scores (e.g. auc) of all layer 2 model_data
-        layer2_model_data_list: This is the list of all layer 2 model_data
+        layer_est_preds: This is the prediction of the layer 2 model_data, you can submit it to see the LB score
+        layer_oof_train: This will be used as training features in higher layers (one from each model_data)
+        layer_oof_mean_test: This will be used as testing features in higher layers (one from each model_data)
+        layer_cv_score: This is a list of cv scores (e.g. auc) of all layer 2 model_data
+        layer_model_data_list: This is the list of all layer 2 model_data
     """
-    layer2_est_preds = {} # directly preditions from the base layer estimators
+    layer_est_preds = {} # directly preditions from the base layer estimators
 
-    layer2_oof_train = {}
-    layer2_oof_test = {}
-    layer2_cv_score = {}
+    layer_oof_train = {}
+    layer_oof_test = {}
+    layer_cv_score = {}
 
-    layer2_model_data_list = []
+    layer_model_data_list = []
 
     for model_name in model_pool.keys():
-        module_logger.info('Generating Layer2 model {} OOF'.format(model_name))
+        module_logger.info('Generating {} model {} OOF'.format(layer, model_name))
         for i, label in enumerate(label_cols):
             #assert train.shape[0] == 159571
 
             model = model_pool[model_name]
 
-            layer1_oof_train_loaded, layer1_oof_test_loaded, _ = layer2_inputs[model_name]
+            layer1_oof_train_loaded, layer1_oof_test_loaded, _ = layer_inputs[model_name]
 
             x_train = combine_layer_oof_per_label(layer1_oof_train_loaded, label)
             x_test = combine_layer_oof_per_label(layer1_oof_test_loaded, label)
@@ -657,13 +661,13 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             oof_train, oof_test, cv_score, cv_train_score \
                 = get_oof(model,  x_train, train[label], x_test, nfolds, seed, metrics_callback=metrics_callback)
 
-            if label not in layer2_oof_train:
-                layer2_oof_train[label] = []
-                layer2_oof_test[label] = []
-            layer2_oof_train[label].append(oof_train)
-            layer2_oof_test[label].append(oof_test)
+            if label not in layer_oof_train:
+                layer_oof_train[label] = []
+                layer_oof_test[label] = []
+            layer_oof_train[label].append(oof_train)
+            layer_oof_test[label].append(oof_test)
 
-            model_id = '{}_{}'.format(model_name, 'layer2')
+            model_id = '{}_{}'.format(model_name, layer)
             if type(model).__name__ == NNBLE.__name__:  # isinstance(model, NNBLE) not working...
                 model.train(x_train, train[label], None, None, x_test)
                 est_preds = model.predict('x_test')
@@ -675,13 +679,13 @@ def compute_layer2_oof(model_pool, layer2_inputs, train, label_cols, nfolds, see
             _save_and_submit(preds_save_path, model_id, est_preds, auto_sub_func)
             _save_and_submit(preds_save_path, model_id+'_oof', np.array(oof_test).reshape(-1,), auto_sub_func)
 
-            if model_id not in layer2_est_preds:
-                layer2_est_preds[model_id] = np.empty((x_test.shape[0], len(label_cols)))
-                layer2_model_data_list.append(model_id)
-            layer2_est_preds[model_id][:, i] = est_preds
-            layer2_cv_score[model_id] = cv_score  # TODO: unlike others, here assuming one label
+            if model_id not in layer_est_preds:
+                layer_est_preds[model_id] = np.empty((x_test.shape[0], len(label_cols)))
+                layer_model_data_list.append(model_id)
+            layer_est_preds[model_id][:, i] = est_preds
+            layer_cv_score[model_id] = cv_score  # TODO: unlike others, here assuming one label
 
-    return layer2_est_preds, layer2_oof_train, layer2_oof_test, layer2_cv_score, layer2_model_data_list
+    return layer_est_preds, layer_oof_train, layer_oof_test, layer_cv_score, layer_model_data_list
 
 
 def _save_and_submit(preds_save_path, pred_name, preds, auto_sub_func):
