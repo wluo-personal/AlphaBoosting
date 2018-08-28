@@ -79,7 +79,7 @@ class LgbGS(GridSearch):
     def cv(self, nfold, stratified):
         gs_start_time = time.time()
         lgb_train = lgb.Dataset(pd.concat([self.X_train, self.X_val]), pd.concat([self.y_train, self.y_val]),
-                                categorical_feature=self.categorical_feature)
+                                categorical_feature=self.categorical_feature, silent=True)
         eval_hist = lgb.cv(self.gs_params, lgb_train, nfold=nfold, stratified=stratified,
                            categorical_feature=self.categorical_feature, verbose_eval=self.verbose_eval, seed=self.seed)
         del lgb_train; gc.collect()
@@ -91,8 +91,8 @@ class LgbGS(GridSearch):
 
     def val(self):
         gs_start_time = time.time()
-        lgb_train = lgb.Dataset(self.X_train, self.y_train, categorical_feature=self.categorical_feature)
-        lgb_val = lgb.Dataset(self.X_val, self.y_val, categorical_feature=self.categorical_feature)
+        lgb_train = lgb.Dataset(self.X_train, self.y_train, categorical_feature=self.categorical_feature, silent=True)
+        lgb_val = lgb.Dataset(self.X_val, self.y_val, categorical_feature=self.categorical_feature, silent=True)
         model = lgb.train(self.gs_params, lgb_train, valid_sets=[lgb_train, lgb_val], verbose_eval=self.verbose_eval)
         del lgb_train, lgb_val; gc.collect()
         best_round = model.best_iteration
@@ -106,7 +106,7 @@ class LgbGS(GridSearch):
         predict_start_time = time.time()
         self.logger.info('Retrain model using best_round [{}] and all data...'.format(self.best_round))
         lgb_all_data = lgb.Dataset(pd.concat([self.X_train, self.X_val]), pd.concat([self.y_train, self.y_val]),
-                                   categorical_feature=self.categorical_feature)
+                                   categorical_feature=self.categorical_feature, silent=True)
         model = lgb.train(self.gs_params, lgb_all_data, valid_sets=lgb_all_data,
                           num_boost_round=self.best_round, verbose_eval=int(0.2 * self.best_round))
         train_alldata_metric = model.best_score['training'][self.metric]

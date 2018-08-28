@@ -80,6 +80,8 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
                         except:
                             print('Auto Submission Failed: ', sys.exc_info()[0])
 
+                gs_res_dict.pop('early_stopping_round',None)
+                gs_res_dict.pop('early_stopping_rounds',None)
                 utils.save_params_and_result(run_id, gs_model, data_name, 'grid_search', gs_res_dict,
                                              ['categorical_column','verbose'], gs_record_dir)
 

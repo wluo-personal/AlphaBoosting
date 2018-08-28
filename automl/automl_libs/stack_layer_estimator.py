@@ -119,6 +119,7 @@ class LightgbmBLE(BaseLayerEstimator):
         self._early_stopping_round = params.pop('early_stopping_round', None)
         if self._early_stopping_round is None:
             self._num_boost_round = params['best_round']  # from gs result csv
+            params.pop('num_boost_round', None)
         else:
             self._num_boost_round = params['num_boost_round']  # from params_gen
         self._verbose_eval = params.pop('verbose_eval', int(self._num_boost_round/10))
@@ -173,15 +174,22 @@ class LightgbmBLE(BaseLayerEstimator):
                 self._model = lgb.train(self._train_params, lgb_train, valid_sets=lgb_val,
                                         num_boost_round=self._num_boost_round, verbose_eval=self._verbose_eval)
         else:
-            if self._early_stopping_round is not None and x_val is not None and y_val is not None:
+            if x_val is not None and y_val is not None:
                 lgb_val = lgb.Dataset(x_val, y_val, categorical_feature=self._categorical_feature)
-                self.logger.info('Val data found, will use early stopping.')
+                if self._early_stopping_round is not None:
+                    self.logger.info('Val data found, will use early stopping.')
+                else:
+                    self.logger.info('Val data found, but NOT use early stopping.')
+
                 self._model = lgb.train(self._train_params, train_set=lgb_train, valid_sets=[lgb_train, lgb_val],
                                         num_boost_round=self._num_boost_round,
                                         early_stopping_rounds=self._early_stopping_round,
                                         verbose_eval=self._verbose_eval)
                 del lgb_train, lgb_val; gc.collect()
-                best_round = self._model.best_iteration
+                if self._model.best_iteration != 0:
+                    best_round = self._model.best_iteration
+                else:
+                    best_round = self._model.current_iteration()
                 val_metric = self._model.best_score['valid_1'][self._metric]
                 train_metric = self._model.best_score['training'][self._metric]
                 self.logger.info('Training Done. Best round: {}. val_{}: {:.5f} | train_{}: {:.5f}'

@@ -75,17 +75,17 @@ def params_gen(model='lgb'):
         }
     elif model == 'xgb':
         params = {
-            'eta': np.random.choice([0.01]),
+            'eta': np.random.choice([0.012,0.006]),
             'objective': 'binary:logistic',
             'eval_metric': 'auc',
 #             'max_bin': 8,
             'scale_pos_weight': np.random.randint(10,40)/10,
             'seed': seed,
-            'nthread': 10,
-            'max_depth': np.random.randint(5,12),
+            'nthread': 4,
+            'max_depth': np.random.randint(5,9),
             'min_child_weight': np.random.randint(3,50),
             'subsample': np.random.randint(80,101)/100,
-            'colsample_bytree': np.random.randint(10,35)/100,
+            'colsample_bytree': np.random.randint(10,50)/100,
 #             'colsample_bylevel': 0.5,
 #             'alpha': 0,
             'lambda': np.random.randint(5, 15)/10,
@@ -103,7 +103,7 @@ def params_gen(model='lgb'):
             'random_seed': seed,
             'use_best_model': True,
             'logging_level': 'Verbose',
-            'thread_count': 15
+            'thread_count': 4
         }
     elif model == 'nn':
         params = {

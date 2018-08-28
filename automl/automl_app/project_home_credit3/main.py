@@ -56,20 +56,22 @@ def params_gen(model='lgb'):
             'boosting': 'gbdt',
             'num_boost_round': 15000, # ignored in params. extract it and put it in input arguments in train or cv explicitly
                                    # seems to work fine as the upper limit when combined with early_stopping_round
-            'learning_rate': np.random.randint(2,10)/1000,
-            'num_leaves': np.random.randint(30, 80),
-            'num_threads': 15, # best speed: set to number of real cpu cores, which is vCPU/2
-            'max_depth': np.random.randint(4,10), # no limit. This is used to deal with over-fitting when #data is small.
-            'min_split_gain': np.random.randint(2, 60)/1000,
-            'min_child_weight': np.random.randint(2, 60),
-            'feature_fraction': np.random.randint(15,80)/100,
+            'learning_rate': 0.01,#np.random.randint(5,15)/1000,
+            'max_bin': np.random.choice([255, 196, 127, 63]),
+            'min_data_in_leaf': np.random.choice([20, 120, 220, 320, 420]),
+            'num_leaves': np.random.randint(40, 200),
+            'num_threads': 18, # best speed: set to number of real cpu cores, which is vCPU/2
+            'max_depth': np.random.randint(4,32), # no limit. This is used to deal with over-fitting when #data is small.
+#             'min_split_gain': np.random.randint(2, 60)/1000,
+            'min_child_weight': np.random.randint(0.01, 300),
+            'feature_fraction': np.random.randint(20,90)/100,
             'feature_fraction_seed': seed,
-            'early_stopping_round':np.random.randint(150,300),
-            'bagging_fraction': np.random.randint(70,91)/100, #Randomly select part of data
+            'early_stopping_round':250,#np.random.randint(150,300),
+            'bagging_fraction': np.random.randint(40,101)/100, #Randomly select part of data
             'bagging_seed': seed,
-            'scale_pos_weight': np.random.randint(10,50)/10,
-            'lambda_l1': np.random.randint(2,50)/100,
-            'lambda_l2': np.random.randint(5,30)/10,
+            'scale_pos_weight': np.random.choice([1, 5, 10, 15]),#np.random.randint(10,50)/10,
+            'lambda_l1': np.random.choice([0.1,0.5,1]),#np.random.randint(2,50)/100,
+            'lambda_l2': np.random.choice([0.01, 0.1, 1]),#np.random.randint(2,20)/10,
             'verbose_eval': 500,
             'metric': 'auc'
         }
@@ -81,7 +83,7 @@ def params_gen(model='lgb'):
 #             'max_bin': 8,
             'scale_pos_weight': np.random.randint(10,40)/10,
             'seed': seed,
-            'nthread': 4,
+            'nthread': 10,
             'max_depth': np.random.randint(5,12),
             'min_child_weight': np.random.randint(3,50),
             'subsample': np.random.randint(80,101)/100,
@@ -95,7 +97,7 @@ def params_gen(model='lgb'):
         }
     elif model == 'catb':
         params = {
-            'iterations': 12000,
+            'iterations': 8000,
             'depth': np.random.randint(4, 9),
             'l2_leaf_reg': np.random.randint(0, 31) / 10,
             #     'custom_metric': 'AUC',
@@ -103,7 +105,7 @@ def params_gen(model='lgb'):
             'random_seed': seed,
             'use_best_model': True,
             'logging_level': 'Verbose',
-            'thread_count': 4
+            'thread_count': 15
         }
     elif model == 'nn':
         params = {
