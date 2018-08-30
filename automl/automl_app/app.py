@@ -311,7 +311,11 @@ class AlphaBoosting:
         train = pd.concat([train, val])
         layers_to_built = self.config_dict['build_stacknet_layers']
         self.logger.info('layers to be built: {}'.format(layers_to_built))
-        _, seed = self.params_gen('lgb')  # does not matter lgb or any other, we just want a seed
+        ########################### probably better to fix the seed ##########################################
+        ############### https://www.kaggle.com/c/home-credit-default-risk/discussion/64288 ###################
+        ########################### probably better to fix the seed ##########################################
+        seed = 1234
+#         _, seed = self.params_gen('lgb')  # does not matter lgb or any other, we just want a seed  
         layer2_counter = 0
         layer3_counter = 0
         for layer in layers_to_built:

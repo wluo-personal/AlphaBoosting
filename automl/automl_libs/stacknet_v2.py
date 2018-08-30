@@ -68,7 +68,7 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
         if layer1_models is None:
             layer1_models = ['xgb', 'lgb', 'catb', 'nn']
         for filename in listdir(gs_result_path):
-            if '_grid_search' in filename and '.csv' in filename:
+            if '_grid_search' in filename and '.csv' in filename and data_name in filename:
                 model_type = filename.split('_')[0]  # LGB, NN, etc...
                 if model_type not in layer1_models:
                     continue
