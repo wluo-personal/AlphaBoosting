@@ -344,6 +344,7 @@ class AlphaBoosting:
                 stacknet.layer2andmore(train, y_test, label_cols, params_gen=self.params_gen,
                                        oof_path=oof_path, metric=self.config_dict['report_metric'],
                                        oof_nfolds=self.config_dict['oof_nfolds_layer2'], seed=seed,
+                                       stratified=self.config_dict['sn_stratified'],
                                        layer1_thresh_or_chosen=
                                        self.config_dict['layer1_thresh_or_chosen_for_layer2'][layer2_counter],
                                        layer='layer2', layer2andmore_models=self.config_dict['layer2_models'],
@@ -353,6 +354,7 @@ class AlphaBoosting:
                 stacknet.layer2andmore(train, y_test, label_cols, params_gen=self.params_gen,
                                        oof_path=oof_path, metric=self.config_dict['report_metric'],
                                        oof_nfolds=self.config_dict['oof_nfolds_layer3'], seed=seed,
+                                       stratified=self.config_dict['sn_stratified'],
                                        layer1_thresh_or_chosen=
                                        self.config_dict['layer2_thresh_or_chosen_for_layer3'][layer3_counter],
                                        layer='layer3', layer2andmore_models=self.config_dict['layer3_models'],
