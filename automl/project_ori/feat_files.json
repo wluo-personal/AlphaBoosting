@@ -1,0 +1,154 @@
+{
+    "list": [
+        {
+            "data_name": "catNorm2_0.25colNUM_148",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm2_0.25colNUM_148.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm2_0.25colNUM_148.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "meByCatRatio_12colNUM_45",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_meByCatRatio_12colNUM_45.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_meByCatRatio_12colNUM_45.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "meByCatRatio_20colNUM_28",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_meByCatRatio_20colNUM_28.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_meByCatRatio_20colNUM_28.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "meByCatRatio_15colNUM_38",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_meByCatRatio_15colNUM_38.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_meByCatRatio_15colNUM_38.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "corr_0.99colNUM_96",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_corr_0.99colNUM_96.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_corr_0.99colNUM_96.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "corr_0.995colNUM_65",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_corr_0.995colNUM_65.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_corr_0.995colNUM_65.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm2_0.05colNUM_25",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm2_0.05colNUM_25.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm2_0.05colNUM_25.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm2_0.1colNUM_54",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm2_0.1colNUM_54.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm2_0.1colNUM_54.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm1_0.15colNUM_92",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm1_0.15colNUM_92.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm1_0.15colNUM_92.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "meByCatRatio_3colNUM_187",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_meByCatRatio_3colNUM_187.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_meByCatRatio_3colNUM_187.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm1_0.25colNUM_155",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm1_0.25colNUM_155.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm1_0.25colNUM_155.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "corr_0.95colNUM_200",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_corr_0.95colNUM_200.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_corr_0.95colNUM_200.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm1_0.3colNUM_175",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm1_0.3colNUM_175.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm1_0.3colNUM_175.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm2_0.3colNUM_169",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm2_0.3colNUM_169.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm2_0.3colNUM_169.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm2_0.15colNUM_90",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm2_0.15colNUM_90.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm2_0.15colNUM_90.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm2_0.35colNUM_186",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm2_0.35colNUM_186.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm2_0.35colNUM_186.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "corr_0.98colNUM_137",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_corr_0.98colNUM_137.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_corr_0.98colNUM_137.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "meByCatRatio_7colNUM_88",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_meByCatRatio_7colNUM_88.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_meByCatRatio_7colNUM_88.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm1_0.1colNUM_53",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm1_0.1colNUM_53.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm1_0.1colNUM_53.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "corr_0.999colNUM_25",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_corr_0.999colNUM_25.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_corr_0.999colNUM_25.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm1_0.2colNUM_127",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm1_0.2colNUM_127.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm1_0.2colNUM_127.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "meByCatRatio_5colNUM_129",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_meByCatRatio_5colNUM_129.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_meByCatRatio_5colNUM_129.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm1_0.05colNUM_26",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm1_0.05colNUM_26.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm1_0.05colNUM_26.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "meByCatRatio_10colNUM_55",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_meByCatRatio_10colNUM_55.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_meByCatRatio_10colNUM_55.pkl",
+            "categorical_features": []
+        },
+        {
+            "data_name": "catNorm2_0.2colNUM_124",
+            "train_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/train_catNorm2_0.2colNUM_124.pkl",
+            "test_data_url": "/home/kai/data/weiluo/AlphaBoosting/home_credit/weiluo/data/fill_na_410/test_catNorm2_0.2colNUM_124.pkl",
+            "categorical_features": []
+        }
+    ]
+}
