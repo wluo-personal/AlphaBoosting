@@ -73,7 +73,7 @@ def get_time(timezone='America/New_York', time_format='%Y-%m-%d %H:%M:%S'):
     return est.strftime(time_format)
 
 
-def get_random_string(length=4):
+def get_random_string(length=5):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
 
 

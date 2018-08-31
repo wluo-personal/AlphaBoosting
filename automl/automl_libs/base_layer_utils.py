@@ -498,8 +498,8 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
     return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1), cv_score, cv_train_score#, oof_test_kf.reshape(-1, nfolds)
 
 
-def compute_layer1_oof(bldr, model_pool, label_cols, auto_sub_func, preds_save_path, nfolds=5, seed=2018,
-                       sfm_threshold=None, metrics_callback=None):
+def compute_layer1_oof(bldr, model_pool, label_cols, auto_sub_func, preds_save_path, nfolds=5, stratified=False,
+                       seed=2018, sfm_threshold=None, metrics_callback=None):
     """
     Params:
         bldr: an instance of BaseLayerDataRepo
@@ -568,7 +568,7 @@ def compute_layer1_oof(bldr, model_pool, label_cols, auto_sub_func, preds_save_p
                     raise ValueError('nfolds of oof can NOT be 0!')
                 oof_train, oof_mean_test, cv_score, cv_train_score = \
                     get_oof(model, x_train, y_train, x_test, nfolds=nfolds,
-                            stratified=True, seed=seed, metrics_callback=metrics_callback)
+                            stratified=stratified, seed=seed, metrics_callback=metrics_callback)
 
                 _save_and_submit(preds_save_path, model_data_id, oof_mean_test, auto_sub_func)
 
@@ -619,8 +619,8 @@ def combine_layer_oof_per_label(layer1_oof_dict, label):
     return x
 
 
-def compute_layer2andmore_oof(model_pool, layer, layer_inputs, train, label_cols, nfolds, seed, auto_sub_func,
-                              preds_save_path, metric, metrics_callback=None):
+def compute_layer2andmore_oof(model_pool, layer, layer_inputs, train, label_cols, nfolds, stratified, seed,
+                              auto_sub_func, preds_save_path, metric, metrics_callback=None):
     """
     Params:
         model_pool: dict. key: an option from ModelName. value: A model
@@ -659,7 +659,8 @@ def compute_layer2andmore_oof(model_pool, layer, layer_inputs, train, label_cols
             x_test = combine_layer_oof_per_label(layer1_oof_test_loaded, label)
 
             oof_train, oof_test, cv_score, cv_train_score \
-                = get_oof(model,  x_train, train[label], x_test, nfolds, seed, metrics_callback=metrics_callback)
+                = get_oof(model,  x_train, train[label], x_test, nfolds, stratified=stratified,
+                          seed=seed, metrics_callback=metrics_callback)
 
             if label not in layer_oof_train:
                 layer_oof_train[label] = []

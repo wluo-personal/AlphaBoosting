@@ -20,8 +20,8 @@ module_logger = logging.getLogger(__name__)
 
 
 def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, params_source,
-           params_gen, layer1_models, build_layer1_amount, top_n_gs, top_n_by, oof_nfolds, seed, oof_path, metric, auto_sub_func,
-           preds_save_path, pg_save_path, gs_result_path=''):
+           params_gen, layer1_models, build_layer1_amount, top_n_gs, top_n_by, oof_nfolds, stratified,
+           seed, oof_path, metric, auto_sub_func, preds_save_path, pg_save_path, gs_result_path=''):
     """
     :param params_source: (str) either 'gs' (grid search, meaning params retrieved from saved gs result csv),
         or 'pg' (param_gen, meaning params retrieved from the param_gen function)
@@ -144,8 +144,8 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                             layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, \
                             layer1_cv_train_score, model_data_id_list = \
                                 compute_layer1_oof(bldr, model_pool, label_cols, auto_sub_func, preds_save_path,
-                                                   nfolds=oof_nfolds, seed=seed, sfm_threshold=None,
-                                                   metrics_callback=metrics_callback)
+                                                   nfolds=oof_nfolds, stratified=stratified, seed=seed,
+                                                   sfm_threshold=None, metrics_callback=metrics_callback)
 
                             base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds,
                                                         layer1_cv_score, model_data_id_list)
@@ -209,14 +209,17 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                     layer1_est_preds, layer1_oof_train, layer1_oof_mean_test, layer1_cv_score, \
                     layer1_cv_train_score, model_data_id_list = \
                         compute_layer1_oof(bldr, model_pool, label_cols, auto_sub_func, preds_save_path,
-                                           nfolds=oof_nfolds, seed=seed, sfm_threshold=None, metrics_callback=metrics_callback)
+                                           nfolds=oof_nfolds, stratified=stratified, seed=seed,
+                                           sfm_threshold=None, metrics_callback=metrics_callback)
 
                     base_layer_results_repo.add(layer1_oof_train, layer1_oof_mean_test, layer1_est_preds,
                                                 layer1_cv_score, model_data_id_list)
 
                     for k, v in layer1_est_preds.items():  # there is only one in layer1_est_preds (see the comment above)
+                        base_layer_results_repo.update_report(k, 'chosen model_data', 'N/A')
                         base_layer_results_repo.update_report(k, 'nfolds', oof_nfolds)
                         base_layer_results_repo.update_report(k, 'seed', seed)
+                        base_layer_results_repo.update_report(k, 'stratified', stratified)
                         if y_test is not None:
                             base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
 
@@ -229,8 +232,8 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                                                  ['categorical_column', 'verbose'], pg_save_path)
 
 
-def layer2andmore(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, seed, metric, layer1_thresh_or_chosen,
-                  layer, layer2andmore_models, auto_sub_func, preds_save_path):
+def layer2andmore(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, stratified, seed, metric,
+                  layer1_thresh_or_chosen, layer, layer2andmore_models, auto_sub_func, preds_save_path):
     """
     :param layer: str. 'layer2', 'layer3', etc..
     :param train: DataFrame with label
@@ -304,7 +307,7 @@ def layer2andmore(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, s
 
     layer2andmore_est_preds, layer2andmore_oof_train, layer2andmore_oof_test, layer2andmore_cv_score, \
     layer2andmore_model_data_list = compute_layer2andmore_oof(
-        model_pool, layer, layer2andmore_inputs, train, label_cols, oof_nfolds, seed, auto_sub_func,
+        model_pool, layer, layer2andmore_inputs, train, label_cols, oof_nfolds, stratified, seed, auto_sub_func,
         preds_save_path, metric=metric, metrics_callback=metrics_callback)
 
     base_layer_results_repo.add(layer2andmore_oof_train, layer2andmore_oof_test, layer2andmore_est_preds,
@@ -315,6 +318,7 @@ def layer2andmore(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, s
         base_layer_results_repo.add_score(model_data, layer2andmore_cv_score[model_data])
         base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2andmore_chosen_model_data[model_id])
         base_layer_results_repo.update_report(model_data, 'nfolds', oof_nfolds)
+        base_layer_results_repo.update_report(model_data, 'stratified', stratified)
 
     if y_test is not None:
         for k, v in layer2andmore_est_preds.items():
