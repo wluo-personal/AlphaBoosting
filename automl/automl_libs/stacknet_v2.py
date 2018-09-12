@@ -8,7 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, log_loss
 import pandas as pd
 from os import listdir
 import pdb
@@ -55,6 +55,7 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
     module_logger.debug(bldr)
 
     metrics_callback = _get_metrics_callback(metric)
+    pdb.set_trace()
 
     if len(listdir(oof_path)) != 0:
         load_from_file = True
@@ -337,6 +338,8 @@ def _get_metrics_callback(metric):
     metrics_callback = None
     if metric == 'auc':
         metrics_callback = roc_auc_score
+    elif 'logloss' in metric:
+        metrics_callback = log_loss
     else:
         module_logger.warning('metric is NOT auc, metric callback will be None')
     return metrics_callback
