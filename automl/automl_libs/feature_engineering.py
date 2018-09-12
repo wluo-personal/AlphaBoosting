@@ -3,6 +3,7 @@ from automl_libs import utils
 from automl_libs import feature_engineering as fe
 import pandas as pd
 import logging, gc
+import numpy as np
 module_logger = logging.getLogger(__name__)
 
 def count(df, cols, dummy_col, generated_feature_name, params=None):
@@ -317,7 +318,7 @@ def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None
     return r
 
 # params['n']: n, params['fillna']: fillna, cols[-1]: time
-def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
+def time_to_n(df, cols, dummy_col, generated_feature_name, params={'n':1,'fillna':np.nan}):
     """Returns dataframe of one feature that consist of 
     integers that indicates the time needed to reach the nth next occurrence of the specific value.
     n=1 indicates the next occurence.
@@ -338,6 +339,8 @@ def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
         This will be the name of column in the returned dataframe.
     params : dictionary, params['n'] and params['fillna'] are used.
         params['n'] is a string of number that indicates the nth next occurrence.
+        if n is greater than 0. It's counting the next n.
+        if n is less than 0, it's coounting the previous n.
         params['fillna'] is a string of number that specifies the number to replace NaN.
 
     Example
@@ -377,12 +380,13 @@ def time_to_n_next(df, cols, dummy_col, generated_feature_name, params=None):
     -----
     pandas.DataFrame.groupby().shift() : shifts within the unique values/combinations of cols[:-1]
     """         
+    
     group_cols = cols[:-1]
     calc_col = cols[-1]
     n = int(params['n'])
     m = int(params['fillna'])
     result = (df[cols].groupby(by=group_cols)[calc_col].shift(-n) - df[calc_col]).fillna(m)
-    result = result.astype(utils.set_type(result, 'uint')).to_frame()
+    result = result.astype(utils.set_type(result, 'int')).to_frame()
     del n, m
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
