@@ -1,9 +1,9 @@
 {
     "project_root": "./",
     "last_run_record_filename": "last_run_record.json",
-    "data_name": "simple1",
-    "train_data_url": "/home/kai/data/shiyi/homecreditdata/train_simple_feats_for_sn_typeastest.pkl",
-    "test_data_url": "/home/kai/data/shiyi/homecreditdata/test_simple_feats_for_sn.pkl",
+    "data_name": "clean1",
+    "train_data_url": "/home/kai/data/shiyi/xunfei/train1.pkl",
+    "test_data_url": "/home/kai/data/shiyi/xunfei/test1.pkl",
     "test_label_url": null,
     "down_sampling_amt": 0,
     "down_sampling_ratio": null, 
@@ -14,13 +14,13 @@
     
     "debug_data": 0,
 
-    "categorical_features": [],
-    "not_features": ["SK_ID_CURR"],
-    "label": "TARGET",
+    "categorical_features": ["creative_is_js", "model", "orderid", "app_id", "app_cate_id", "campaign_id", "creative_tp_dnf", "ad_i_i_lvl1", "f_channel", "time_hour", "advert_name", "os_name", "inner_slot_id", "creative_is_voicead", "creative_is_jump", "app_paid", "creative_is_download", "creative_res", "creative_res_popularity", "is_shenghuicity", "creative_id", "province", "vertical_screen", "nnt", "amt_usertags", "ad_i_i_lvl2", "advert_industry_inner", "city", "datetime", "make", "carrier", "adid", "has_usertags", "os", "osv", "time_day", "user_tags", "advert_id", "devtype", "creative_has_deeplink", "creative_type"],
+    "not_features": ["instance_id", "time"],
+    "label": "click",
 
     "do_gs": true,
     "gs_models": "lgb",
-    "gs_search_rounds": 30,
+    "gs_search_rounds": 1,
     "gs_cv": true,
     "gs_cv_stratified": true,
     "gs_nfold": 5,
@@ -29,7 +29,8 @@
     "gs_suppress_warning": true,
 
     "do_stacknet": true,
-    "report_metric": "auc",
+    "report_metric": "binary_logloss",
+    "report_metric_rank_ascending": true,
     "sn_stratified": true,
     "build_stacknet_layers": [1],
 
@@ -38,8 +39,8 @@
     "oof_nfolds_layer1": 5,
     "params_source": "gs",
     "build_layer1_amount__pg": 1,
-    "top_n_per_gs_res_for_layer1__gs": 4,
-    "top_n_by__gs": "auc",
+    "top_n_per_gs_res_for_layer1__gs": 1,
+    "top_n_by__gs": "binary_logloss",
 
     "__layer2config__": "#### layer2config ####",
     "layer1_thresh_or_chosen_for_layer2": [["oFsf__XGB_bo2_w2v_newcat_layer1", "1CKg__LGB_flight_data_ordinal_layer1", "dQTL__LGB_flight_data_ordinal_layer1", "pC2i__LGB_flight_data_ordinal_layer1", "f4XK__XGB_bo2_w2v_newcat_layer1", "KnJq__XGB_onehot_layer1", "x26K__XGB_onehot_layer1", "zTty__CATB_bo2_newcat_80pnull_layer1", "HyEX__LGB_fe_repro_1_layer1", "sFig__LGB_fe_repro_1_layer1", "ksIj__LGB_flight_data_ordinal_layer1", "OuFu__XGB_bo2_w2v_newcat_layer1", "3VXI__LGB_flight_data_ordinal_layer1", "9QmW__LGB_flight_data_ordinal_layer1", "VK0U__XGB_onehot_layer1", "6Keg__XGB_onehot_layer1", "Ro9e__XGB_onehot_layer1", "pVfN__LGB_fe_repro_1_layer1", "uvRx__LGB_fe_repro_1_layer1"]],
@@ -69,6 +70,7 @@
         "build_layer1_amount": "int > 0. Only takes effect when params_source == pg",
         "layer1_models": "a list of chosen models. e.g. [lgb, xgb, catb, nn]. if null, all models found in grid search result will be checked",
         "top_n_per_gs_res_for_layer1__gs": "1. say it's 3, and layer1_models is [xgb, lgb], then in xgb and lgb grid search result, the top 3 params in each result csv (based on metric of 'top_n_by') will be chosen to build layer1. 2. ignored if params_gen is 'pg' ",
-        "layer1_thresh": "threshold(based on gs_val_auc) to choosen from layer1 models to construct layer2 models"
+        "layer1_thresh": "threshold(based on gs_val_auc) to choosen from layer1 models to construct layer2 models",
+        "report_metric_rank_ascending": "If auc, then false, because top is better in descending order. If logloss, then true, because top is better when in ascending order." 
     }
 }

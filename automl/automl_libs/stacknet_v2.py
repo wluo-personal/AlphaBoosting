@@ -21,7 +21,7 @@ module_logger = logging.getLogger(__name__)
 
 def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label_cols, params_source,
            params_gen, layer1_models, build_layer1_amount, top_n_gs, top_n_by, oof_nfolds, stratified,
-           seed, oof_path, metric, auto_sub_func, preds_save_path, pg_save_path, gs_result_path=''):
+           seed, oof_path, metric, ascending, auto_sub_func, preds_save_path, pg_save_path, gs_result_path=''):
     """
     :param params_source: (str) either 'gs' (grid search, meaning params retrieved from saved gs result csv),
         or 'pg' (param_gen, meaning params retrieved from the param_gen function)
@@ -55,7 +55,6 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
     module_logger.debug(bldr)
 
     metrics_callback = _get_metrics_callback(metric)
-    pdb.set_trace()
 
     if len(listdir(oof_path)) != 0:
         load_from_file = True
@@ -77,10 +76,10 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                     # in grid search result of catboost, it's 'val_AUC',
                     # in all other models, it's 'val_auc'
                     gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
-                        .sort_values(by='val_'+top_n_by.lower(), ascending=False)
+                        .sort_values(by='val_'+top_n_by.lower(), ascending=ascending)
                 except KeyError:
                     gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0') \
-                        .sort_values(by='val_'+top_n_by.upper(), ascending=False)
+                        .sort_values(by='val_'+top_n_by.upper(), ascending=ascending)
                 # gs_res_dict = gs_res.T.to_dict()
                 chosen_res_dict = gs_res.head(top_n_gs).T.to_dict()
 

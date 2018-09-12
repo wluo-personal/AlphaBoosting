@@ -491,7 +491,6 @@ def get_oof(clf, x_train, y_train, x_test, nfolds, stratified=False, shuffle=Tru
         oof_test_kf[i, :] = y_pred_of_test
 
     oof_test[:] = oof_test_kf.mean(axis=0)
-    pdb.set_trace()
     oof_train_score = metrics_callback(y_train, oof_train)
     cv_score = oof_train_score  #cv_score / nfolds
     cv_train_score = cv_train_score / nfolds
