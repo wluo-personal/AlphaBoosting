@@ -30,6 +30,7 @@
 
     "do_stacknet": true,
     "report_metric": "auc",
+    "sn_stratified": true,
     "build_stacknet_layers": [1],
 
     "__layer1config__": "#### layer1config ####",
