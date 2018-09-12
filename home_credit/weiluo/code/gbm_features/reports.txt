@@ -1,0 +1,322 @@
+original:
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 764) (48744, 764) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  795] AUC : ho: 0.794584 / te: 0.795493 / tr: 0.852858 (diff: 0.000909)
+Fold  2 [ 1078] AUC : ho: 0.795753 / te: 0.795111 / tr: 0.865921 (diff: 0.000642)
+Fold  3 [ 1160] AUC : ho: 0.795761 / te: 0.792183 / tr: 0.871919 (diff: 0.003578)
+Fold  4 [ 1251] AUC : ho: 0.795716 / te: 0.800059 / tr: 0.874186 (diff: 0.004342)
+Fold  5 [ 1175] AUC : ho: 0.795232 / te: 0.790522 / tr: 0.873062 (diff: 0.004710)
+Full HO score 0.798031
+FULL HO mean 0.795409, std 0.000458
+FULL TE mean 0.794674, std 0.003265
+FULL TR mean 0.867589, std 0.007899
+FULL DIFF mean 0.002836, std 0.001724
+Run LightGBM with kfold - done in 124s
+
+
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 1190) (48744, 1189) (43931, 1190)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  901] AUC : ho: 0.794977 / te: 0.796087 / tr: 0.858572 (diff: 0.001110)
+Fold  2 [ 1071] AUC : ho: 0.795916 / te: 0.795247 / tr: 0.866066 (diff: 0.000669)
+Fold  3 [ 1112] AUC : ho: 0.794999 / te: 0.791251 / tr: 0.869353 (diff: 0.003748)
+Fold  4 [ 1044] AUC : ho: 0.795892 / te: 0.799653 / tr: 0.864019 (diff: 0.003761)
+Fold  5 [ 1192] AUC : ho: 0.795771 / te: 0.790305 / tr: 0.873263 (diff: 0.005466)
+Full HO score 0.798341
+FULL HO mean 0.795511, std 0.000430
+FULL TE mean 0.794508, std 0.003400
+FULL TR mean 0.866255, std 0.004955
+FULL DIFF mean 0.002951, std 0.001801
+Run LightGBM with kfold - done in 145s
+
+
+
+1. nn files, already fillna
+
+quantile transform all numerical columns
+
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 764) (48744, 763) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  853] AUC : ho: 0.794078 / te: 0.795882 / tr: 0.852977 (diff: 0.001804)
+Fold  2 [  936] AUC : ho: 0.795909 / te: 0.794368 / tr: 0.857009 (diff: 0.001541)
+Fold  3 [ 1161] AUC : ho: 0.794113 / te: 0.791004 / tr: 0.868883 (diff: 0.003109)
+Fold  4 [ 1018] AUC : ho: 0.794572 / te: 0.799250 / tr: 0.861012 (diff: 0.004678)
+Fold  5 [ 1055] AUC : ho: 0.794971 / te: 0.788528 / tr: 0.864016 (diff: 0.006443)
+Full HO score 0.797070
+FULL HO mean 0.794729, std 0.000675
+FULL TE mean 0.793806, std 0.003741
+FULL TR mean 0.860779, std 0.005501
+FULL DIFF mean 0.003515, std 0.001839
+Run LightGBM with kfold - done in 117s
+
+conclusion: worse than original. <1>. quantile transofrm <2>. self fillna
+
+
+2. nn files, already fillna
+do not do quantile transform for numerical columns
+
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 764) (48744, 763) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [ 1123] AUC : ho: 0.794032 / te: 0.795592 / tr: 0.866172 (diff: 0.001560)
+Fold  2 [  866] AUC : ho: 0.795445 / te: 0.794857 / tr: 0.853047 (diff: 0.000588)
+Fold  3 [ 1590] AUC : ho: 0.794992 / te: 0.792525 / tr: 0.888349 (diff: 0.002467)
+Fold  4 [  770] AUC : ho: 0.795173 / te: 0.799331 / tr: 0.847152 (diff: 0.004158)
+Fold  5 [ 1519] AUC : ho: 0.796163 / te: 0.790002 / tr: 0.884243 (diff: 0.006161)
+Full HO score 0.797987
+FULL HO mean 0.795161, std 0.000691
+FULL TE mean 0.794462, std 0.003123
+FULL TR mean 0.867793, std 0.016366
+FULL DIFF mean 0.002986, std 0.001975
+Run LightGBM with kfold - done in 128s
+conclusion: worse than original but better than 1.  <2>. self fillna
+
+3. original file, set 37 categorical columns
+
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 764) (48744, 763) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [ 1183] AUC : ho: 0.794883 / te: 0.795975 / tr: 0.875100 (diff: 0.001092)
+Fold  2 [ 1039] AUC : ho: 0.795680 / te: 0.795237 / tr: 0.866972 (diff: 0.000443)
+Fold  3 [ 1101] AUC : ho: 0.795589 / te: 0.791723 / tr: 0.871620 (diff: 0.003866)
+Fold  4 [ 1188] AUC : ho: 0.795296 / te: 0.799801 / tr: 0.874203 (diff: 0.004505)
+Fold  5 [ 1178] AUC : ho: 0.794854 / te: 0.791989 / tr: 0.875180 (diff: 0.002865)
+Full HO score 0.798032
+FULL HO mean 0.795261, std 0.000344
+FULL TE mean 0.794945, std 0.002961
+FULL TR mean 0.872615, std 0.003102
+FULL DIFF mean 0.002554, std 0.001563
+Run LightGBM with kfold - done in 131s
+
+conclusion: almost the same as original but train gets higher score, maybe overfit on train. do not use
+
+
+
+4. original file, one hot encoding for 37 categorical columns. Drop = True
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 1190) (48744, 1189) (43931, 1190)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  901] AUC : ho: 0.794977 / te: 0.796087 / tr: 0.858572 (diff: 0.001110)
+Fold  2 [ 1071] AUC : ho: 0.795916 / te: 0.795247 / tr: 0.866066 (diff: 0.000669)
+Fold  3 [ 1112] AUC : ho: 0.794999 / te: 0.791251 / tr: 0.869353 (diff: 0.003748)
+Fold  4 [ 1044] AUC : ho: 0.795892 / te: 0.799653 / tr: 0.864019 (diff: 0.003761)
+Fold  5 [ 1192] AUC : ho: 0.795771 / te: 0.790305 / tr: 0.873263 (diff: 0.005466)
+Full HO score 0.798341
+FULL HO mean 0.795511, std 0.000430
+FULL TE mean 0.794508, std 0.003400
+FULL TR mean 0.866255, std 0.004955
+FULL DIFF mean 0.002951, std 0.001801
+Run LightGBM with kfold - done in 145s
+
+
+conclusion: HO is better than original but CS is worse. Do not use.
+
+
+5. original file, one hot encoding for 37 categorical columns. Drop = False
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 1227) (48744, 1226) (43931, 1227)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  974] AUC : ho: 0.794337 / te: 0.795565 / tr: 0.861925 (diff: 0.001228)
+Fold  2 [ 1028] AUC : ho: 0.795862 / te: 0.795604 / tr: 0.863618 (diff: 0.000258)
+Fold  3 [ 1171] AUC : ho: 0.795528 / te: 0.791150 / tr: 0.871872 (diff: 0.004378)
+Fold  4 [ 1295] AUC : ho: 0.795790 / te: 0.799612 / tr: 0.876792 (diff: 0.003821)
+Fold  5 [ 1243] AUC : ho: 0.796043 / te: 0.789709 / tr: 0.875667 (diff: 0.006335)
+Full HO score 0.798455
+FULL HO mean 0.795512, std 0.000610
+FULL TE mean 0.794328, std 0.003536
+FULL TR mean 0.869975, std 0.006127
+FULL DIFF mean 0.003204, std 0.002197
+Run LightGBM with kfold - done in 152s
+
+
+conclusion: HO is better than original but CS is worse. Do not use.
+
+
+*6. original file, ordinal encoding for 37 categorical columns. 
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 764) (48744, 763) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [ 1041] AUC : ho: 0.794702 / te: 0.795972 / tr: 0.865806 (diff: 0.001269)
+Fold  2 [ 1024] AUC : ho: 0.795911 / te: 0.795052 / tr: 0.863383 (diff: 0.000859)
+Fold  3 [ 1359] AUC : ho: 0.795482 / te: 0.792739 / tr: 0.881130 (diff: 0.002743)
+Fold  4 [ 1041] AUC : ho: 0.795468 / te: 0.798881 / tr: 0.864765 (diff: 0.003413)
+Fold  5 [ 1096] AUC : ho: 0.796445 / te: 0.791175 / tr: 0.869291 (diff: 0.005270)
+Full HO score 0.798221
+FULL HO mean 0.795602, std 0.000574
+FULL TE mean 0.794764, std 0.002664
+FULL TR mean 0.868875, std 0.006432
+FULL DIFF mean 0.002711, std 0.001584
+Run LightGBM with kfold - done in 127s
+
+
+conclusion: HO is better than original and CV is better.Very slight difference. 
+
+7. ooriginal file, ordinal encoding for all 37 categorical columns.
+#############################################
+0.07 20 5 16 20 1 0.5 0.05 nfolds: 5
+#############################################
+(263580, 1526) (48744, 1525) (43931, 1526)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  870] AUC : ho: 0.794142 / te: 0.795247 / tr: 0.863135 (diff: 0.001105)
+Fold  2 [  852] AUC : ho: 0.794420 / te: 0.795071 / tr: 0.862395 (diff: 0.000651)
+Fold  3 [ 1167] AUC : ho: 0.795826 / te: 0.791919 / tr: 0.880742 (diff: 0.003907)
+Fold  4 [  967] AUC : ho: 0.794566 / te: 0.799670 / tr: 0.869728 (diff: 0.005105)
+Fold  5 [  823] AUC : ho: 0.793967 / te: 0.788159 / tr: 0.861696 (diff: 0.005808)
+Full HO score 0.797311
+FULL HO mean 0.794584, std 0.000655
+FULL TE mean 0.794013, std 0.003829
+FULL TR mean 0.867539, std 0.007199
+FULL DIFF mean 0.003315, std 0.002086
+Run LightGBM with kfold - done in 206s
+
+Conclusion: HO worse, and CV get worse.
+
+
+-------------------------------------------------------------------------------------------------
+retain devided
+add estimate apr, 60,0.25
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+(263580, 764) (48744, 763) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  340] AUC : ho: 0.793877 / te: 0.793334 / tr: 0.847067 (diff: 0.000543)
+Fold  2 [  507] AUC : ho: 0.792982 / te: 0.792380 / tr: 0.865033 (diff: 0.000602)
+Fold  3 [  720] AUC : ho: 0.794863 / te: 0.794581 / tr: 0.885172 (diff: 0.000283)
+Fold  4 [  441] AUC : ho: 0.793465 / te: 0.788915 / tr: 0.859570 (diff: 0.004550)
+Full HO score 0.798336
+FULL HO mean 0.793797, std 0.000692
+FULL TE mean 0.792302, std 0.002106
+FULL TR mean 0.864211, std 0.013743
+FULL DIFF mean 0.001494, std 0.001768
+Run LightGBM with kfold - done in 67s
+
+retain devided
+add estimate terms, 60,0.25
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+(263580, 764) (48744, 763) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  381] AUC : ho: 0.792286 / te: 0.792208 / tr: 0.850945 (diff: 0.000078)
+Fold  2 [  421] AUC : ho: 0.793060 / te: 0.792371 / tr: 0.855359 (diff: 0.000689)
+Fold  3 [  440] AUC : ho: 0.793739 / te: 0.793177 / tr: 0.857575 (diff: 0.000562)
+Fold  4 [  541] AUC : ho: 0.792030 / te: 0.788995 / tr: 0.869544 (diff: 0.003035)
+Full HO score 0.796631
+FULL HO mean 0.792779, std 0.000672
+FULL TE mean 0.791688, std 0.001598
+FULL TR mean 0.858356, std 0.006886
+FULL DIFF mean 0.001091, std 0.001145
+Run LightGBM with kfold - done in 65s
+
+retain devided
+add estimate terms and apr, 60,0.25
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+(263580, 765) (48744, 764) (43931, 765)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  682] AUC : ho: 0.791419 / te: 0.794682 / tr: 0.883748 (diff: 0.003263)
+Fold  2 [  352] AUC : ho: 0.794142 / te: 0.792998 / tr: 0.848848 (diff: 0.001144)
+Fold  3 [  670] AUC : ho: 0.791031 / te: 0.795589 / tr: 0.882140 (diff: 0.004559)
+Fold  4 [  419] AUC : ho: 0.792907 / te: 0.788303 / tr: 0.857218 (diff: 0.004604)
+Full HO score 0.797008
+FULL HO mean 0.792375, std 0.001238
+FULL TE mean 0.792893, std 0.002808
+FULL TR mean 0.867988, std 0.015256
+FULL DIFF mean 0.003392, std 0.001405
+Run LightGBM with kfold - done in 69s
+
+retain devided
+add estimate lowLimitLength, 60,0.25
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+(263580, 764) (48744, 763) (43931, 764)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  503] AUC : ho: 0.792820 / te: 0.792272 / tr: 0.864380 (diff: 0.000548)
+Fold  2 [  432] AUC : ho: 0.794196 / te: 0.792652 / tr: 0.857109 (diff: 0.001544)
+Fold  3 [  755] AUC : ho: 0.791915 / te: 0.793699 / tr: 0.888057 (diff: 0.001783)
+Fold  4 [  472] AUC : ho: 0.793183 / te: 0.788572 / tr: 0.863100 (diff: 0.004610)
+Full HO score 0.797709
+FULL HO mean 0.793029, std 0.000817
+FULL TE mean 0.791799, std 0.001935
+FULL TR mean 0.868161, std 0.011810
+FULL DIFF mean 0.002121, std 0.001510
+Run LightGBM with kfold - done in 69s
+
+
+drop devided
+add estimate apr, 60,0.25
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+(263580, 763) (48744, 762) (43931, 763)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  471] AUC : ho: 0.792315 / te: 0.792926 / tr: 0.860970 (diff: 0.000611)
+Fold  2 [  456] AUC : ho: 0.791759 / te: 0.791733 / tr: 0.858885 (diff: 0.000026)
+Fold  3 [  353] AUC : ho: 0.793034 / te: 0.792718 / tr: 0.846715 (diff: 0.000317)
+Fold  4 [  403] AUC : ho: 0.792789 / te: 0.787297 / tr: 0.853572 (diff: 0.005492)
+Full HO score 0.796355
+FULL HO mean 0.792474, std 0.000487
+FULL TE mean 0.791168, std 0.002280
+FULL TR mean 0.855035, std 0.005509
+FULL DIFF mean 0.001611, std 0.002250
+Run LightGBM with kfold - done in 70s
+
+drop devided
+add estimate terms, 60,0.25
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+(263580, 763) (48744, 762) (43931, 763)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  387] AUC : ho: 0.791491 / te: 0.791295 / tr: 0.850572 (diff: 0.000196)
+Fold  2 [  608] AUC : ho: 0.791870 / te: 0.790856 / tr: 0.874491 (diff: 0.001014)
+Fold  3 [  645] AUC : ho: 0.790765 / te: 0.793305 / tr: 0.876959 (diff: 0.002540)
+Fold  4 [  583] AUC : ho: 0.792148 / te: 0.786663 / tr: 0.872935 (diff: 0.005485)
+Full HO score 0.796097
+FULL HO mean 0.791568, std 0.000519
+FULL TE mean 0.790530, std 0.002416
+FULL TR mean 0.868739, std 0.010587
+FULL DIFF mean 0.002309, std 0.002018
+Run LightGBM with kfold - done in 71s
+
+drop devided
+add terms and apr, 60,0.25
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+#############################################
+0.07 20 5 16 20 1 0.5 0.1 nfolds: 4
+#############################################
+(263580, 763) (48744, 762) (43931, 763)
+MEAN: train(263580) vs holdout(43931):  0.0807572653463844 0.08055814800482575
+Fold  1 [  499] AUC : ho: 0.791719 / te: 0.792725 / tr: 0.863364 (diff: 0.001005)
+Fold  2 [  485] AUC : ho: 0.792762 / te: 0.791535 / tr: 0.862166 (diff: 0.001227)
+Fold  3 [  546] AUC : ho: 0.790819 / te: 0.793213 / tr: 0.867005 (diff: 0.002394)
+Fold  4 [  438] AUC : ho: 0.793163 / te: 0.787305 / tr: 0.857855 (diff: 0.005859)
+Full HO score 0.796240
+FULL HO mean 0.792116, std 0.000916
+FULL TE mean 0.791194, std 0.002327
+FULL TR mean 0.862598, std 0.003267
+FULL DIFF mean 0.002621, std 0.001942
+Run LightGBM with kfold - done in 69s
