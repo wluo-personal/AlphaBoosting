@@ -16,6 +16,6 @@
 * Stage 4: Model Tuning:  using Bayesian Optimization to set up a guided search for the best hyperparameters. *
 * Stage 5: Model Ensembling: construct a StackNet to find the optimal combination of diverse models for better performance.
 * Stage 6: Model Explanation: utilize a unified approach (SHAP) to explain the output of any machine learning model. 
-##### * on-going   ^ manual
+##### * in-progress   ^ manual
 
 
