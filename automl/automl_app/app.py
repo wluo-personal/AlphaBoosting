@@ -126,7 +126,7 @@ class AlphaBoosting:
         self._feature_engineering(to_do_dict)
         
         # get validation
-        self.logger.info('STAGE: ' + self.Stage.VALIDATION_DOWNSAMPLING_GEN.name)
+        # self.logger.info('STAGE: ' + self.Stage.VALIDATION_DOWNSAMPLING_GEN.name)
         self._validation_and_down_sampling(to_do_dict)
         
         # concatenant test: c
@@ -153,9 +153,9 @@ class AlphaBoosting:
 
     # util functions
     def _read_data(self):
-        self.train = pd.read_pickle(self.train_data_url)
-        self.test = pd.read_pickle(self.test_data_url)
-        self.df = pd.concat([self.train, self.test], sort=True, ignore_index=True)
+        self.train = pd.read_pickle(self.train_data_url).reset_index(drop=True)
+        self.test = pd.read_pickle(self.test_data_url).reset_index(drop=True)
+        self.df = pd.concat([self.train, self.test], sort=False, ignore_index=True).reset_index(drop=True)
         self.train_len = self.train.shape[0]
 
     @staticmethod

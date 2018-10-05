@@ -53,7 +53,8 @@ def gs(data_name, X_train, y_train, X_val, y_val, categorical_feature, search_ro
         for i in range(search_rounds):
             try:
                 run_id = utils.get_random_string()  # also works as the index of the result dataframe
-                module_logger.info('Grid search {} [{}]. round {} of {}'.format(gs_model, run_id, i+1, search_rounds))
+                module_logger.info('Grid search {} [{}] (folds:{}). round {} of {}'
+                                   .format(gs_model, run_id, nfold, i+1, search_rounds))
                 gs_instance = gsf.get_gs_instance(X_train, y_train, X_val, y_val, categorical_feature,
                                                   gs_params_gen, gs_model, verbose_eval, X_test, fixseed)
                 metric = gs_instance.metric

@@ -72,14 +72,23 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                 model_type = filename.split('_')[0]  # LGB, NN, etc...
                 if model_type not in layer1_models:
                     continue
-                try:
-                    # in grid search result of catboost, it's 'val_AUC',
-                    # in all other models, it's 'val_auc'
-                    gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
-                        .sort_values(by='val_'+top_n_by.lower(), ascending=ascending)
-                except KeyError:
-                    gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0') \
-                        .sort_values(by='val_'+top_n_by.upper(), ascending=ascending)
+
+                # get the val_metric col name
+                gs_res = pd.read_csv(gs_result_path + filename, index_col='Unnamed: 0')
+                for col in gs_res.columns:
+                    if top_n_by in col.lower() and 'val' in col.lower():
+                        val_metric_colname = col
+                        module_logger.debug('Topn will be selected based on [{}]'.format(val_metric_colname))
+                        break
+                gs_res = gs_res.sort_values(by=val_metric_colname, ascending=ascending)
+                # try:
+                #     # in grid search result of catboost, it's 'val_AUC',
+                #     # in all other models, it's 'val_auc'
+                #     gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0')\
+                #         .sort_values(by='val_'+top_n_by.lower(), ascending=ascending)
+                # except KeyError:
+                #     gs_res = pd.read_csv(gs_result_path+filename, index_col='Unnamed: 0') \
+                #         .sort_values(by='val_'+top_n_by.upper(), ascending=ascending)
                 # gs_res_dict = gs_res.T.to_dict()
                 chosen_res_dict = gs_res.head(top_n_gs).T.to_dict()
 
@@ -122,7 +131,11 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                             model_params = {}
                             for key in keys_in_original_params:
                                 model_params[key] = params[key]
-                            # model_params['iterations'] = params['best_round']
+                            # if it's true, then the stacknet will stick to the best_round computed by grid search
+                            # hence use_best_model will be set to true
+                            if params['use_best_model']:
+                                model_params['iterations'] = params['best_round']
+                                model_params['use_best_model'] = False
                             print(model_params)
                             model_params['categorical_feature'] = categorical_cols
                             model_params['verbose_eval'] = int(params['iterations'] / 10)
@@ -155,12 +168,13 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                             # model_data into the repo.
                             for model_data in model_data_id_list:
                                 result_index = model_data.split('__')[0]
-                                try:
-                                    # in grid search result of catboost, it's val_AUC,
-                                    # in all others, it's val_auc
-                                    val_score = chosen_res_dict[result_index]['val_' + metric.lower()]
-                                except KeyError:
-                                    val_score = chosen_res_dict[result_index]['val_' + metric.upper()]
+                                val_score = chosen_res_dict[result_index][val_metric_colname]
+                                # try:
+                                #     # in grid search result of catboost, it's val_AUC,
+                                #     # in all others, it's val_auc
+                                #     val_score = chosen_res_dict[result_index]['val_' + metric.lower()]
+                                # except KeyError:
+                                #     val_score = chosen_res_dict[result_index]['val_' + metric.upper()]
                                 # base_layer_results_repo.add_score(model_data, val_score)  # will use oof_cv_score instead
                                 base_layer_results_repo.update_report(model_data, 'gs_val_{}'.format(metric), val_score)
 
@@ -168,7 +182,7 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                                 base_layer_results_repo.update_report(k, 'nfolds', oof_nfolds)
                                 base_layer_results_repo.update_report(k, 'seed', seed)
                                 if y_test is not None:
-                                    base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
+                                    base_layer_results_repo.update_report(k, 'test_score', metrics_callback(y_test, v))
 
                             base_layer_results_repo.save()
 
@@ -221,7 +235,7 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                         base_layer_results_repo.update_report(k, 'seed', seed)
                         base_layer_results_repo.update_report(k, 'stratified', stratified)
                         if y_test is not None:
-                            base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
+                            base_layer_results_repo.update_report(k, 'test_score', metrics_callback(y_test, v))
 
                     base_layer_results_repo.save()
 
@@ -322,7 +336,7 @@ def layer2andmore(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, s
 
     if y_test is not None:
         for k, v in layer2andmore_est_preds.items():
-            base_layer_results_repo.update_report(k, 'test_score', roc_auc_score(y_test, v))
+            base_layer_results_repo.update_report(k, 'test_score', metrics_callback(y_test, v))
 
     base_layer_results_repo.save()
 

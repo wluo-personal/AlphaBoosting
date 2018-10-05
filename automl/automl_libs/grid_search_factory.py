@@ -164,7 +164,12 @@ class CatbGS(GridSearch):
             stratified=stratified,
             verbose_eval=self.verbose_eval
         )
-        best_round = eval_hist['test-' + self.metric + '-mean'].values.argmax()
+        if 'auc' in self.metric.lower():
+            best_round = eval_hist['test-' + self.metric + '-mean'].values.argmax()
+        elif 'logloss' in self.metric.lower():
+            best_round = eval_hist['test-' + self.metric + '-mean'].values.argmin()
+        else:
+            raise NotImplementedError('{} is not supported yet!'.format(self.metric))
         self.gs_params['iterations'] = best_round
         cv_val_metric = eval_hist['test-' + self.metric + '-mean'][best_round]
         cv_train_metric = eval_hist['train-' + self.metric + '-mean'][best_round]
@@ -289,11 +294,11 @@ class NNGS(GridSearch):
             cb.append(nn_libs.RocAucMetricCallback(validation_data=(self.nn_valid_dict, self.y_val),
                                                    predict_batch_size=self.gs_params['pred_batch_size']))
         cb.extend([
-            EarlyStopping(monitor=self.gs_params['monitor'], mode=self.gs_params['mode'], patience=self.gs_params['patience'],
-                          verbose=2),
+            EarlyStopping(monitor=self.gs_params['monitor'], mode=self.gs_params['mode'],
+                          patience=self.gs_params['patience'], verbose=2),
             nn_libs.LearningRateTracker(include_on_batch=False),
             ModelCheckpoint(saved_model_file_name, monitor=self.gs_params['monitor'], verbose=1, save_best_only=True,
-                            mode='max')
+                            mode=self.gs_params['mode'])
             # LearningRateScheduler(lambda x: lr * (lr_decay ** x))
         ])
         self.model.fit(self.nn_train_dict, self.y_train, validation_data=[self.nn_valid_dict, self.y_val],
@@ -301,6 +306,7 @@ class NNGS(GridSearch):
                        verbose=self.verbose_eval, callbacks=cb)
 
         hist = self.model.history
+        pdb.set_trace()
         bst_epoch = np.argmax(hist.history[self.gs_params['monitor']])
         if self.gs_params['monitor'] == 'val_auc':
             val_auc = hist.history['val_auc'][bst_epoch]

@@ -60,7 +60,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             if isinstance(embed_outdim, dict):
                 embed_output_dimension = embed_outdim[col]
             else:
-                embed_output_dimension = np.min([embed_outdim, embed_input_dim])
+                embed_output_dimension = np.min([embed_outdim, int(embed_input_dim/2)])
             total_cate_embedding_dimension += embed_output_dimension
             module_logger.debug('Col [{}]: embed dim: input {}, output {}'
                                 .format(col, embed_input_dim, embed_output_dimension))

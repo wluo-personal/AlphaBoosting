@@ -82,6 +82,7 @@ def unique_count(df, cols, dummy_col, generated_feature_name, params=None):
     cols : array-like
         Array of string names of columns.
         The last column in the array is the one that the unique values are counted.
+    dummy_col: str (useless)
     generated_feature_name : str
         This will be the name of column in the returned dataframe.
     params : dictionary,  not used here
