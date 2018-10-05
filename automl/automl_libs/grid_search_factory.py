@@ -268,10 +268,9 @@ class XgbGS(GridSearch):
 class NNGS(GridSearch):
 
     def init_more(self):
-        if self.gs_params['monitor'] == 'val_auc':
-            self.metric = 'auc'
-        else:
-            self.metric = 'notdefined'
+        if self.gs_params['monitor'] != 'val_auc' and self.gs_params['monitor'] != 'val_loss':
+            raise ValueError('{} is not a supported <monitor> in NN(automl) yet. Support: val_auc, val_loss'
+                             .format(self.gs_params['monitor']))
         self.model, self.nn_train_dict, self.nn_valid_dict, self.nn_test_dict = \
             nn_libs.get_model(self.gs_params, self.X_train, self.X_val, self.X_test, self.categorical_feature)
         from keras.utils import plot_model
@@ -306,12 +305,13 @@ class NNGS(GridSearch):
                        verbose=self.verbose_eval, callbacks=cb)
 
         hist = self.model.history
-        pdb.set_trace()
-        bst_epoch = np.argmax(hist.history[self.gs_params['monitor']])
         if self.gs_params['monitor'] == 'val_auc':
+            bst_epoch = np.argmax(hist.history['val_auc'])
             val_auc = hist.history['val_auc'][bst_epoch]
             self.gs_params['val_auc'] = val_auc  # hence the val_auc score will be later saved in csv
             self.logger.info('val_auc: {:.5f}'.format(val_auc))
+        elif self.gs_params['monitor'] == 'val_loss':
+            bst_epoch = np.argmin(hist.history['val_loss'])
         trn_loss = hist.history['loss'][bst_epoch]
         trn_acc = hist.history['acc'][bst_epoch]  # TODO: acc might not be there if regression problem
         val_loss = hist.history['val_loss'][bst_epoch]

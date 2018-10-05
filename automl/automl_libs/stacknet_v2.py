@@ -80,6 +80,11 @@ def layer1(data_name, train, test, y_test, categorical_cols, feature_cols, label
                         val_metric_colname = col
                         module_logger.debug('Topn will be selected based on [{}]'.format(val_metric_colname))
                         break
+                if model_type == 'nn':
+                    if top_n_by == 'logloss':
+                        val_metric_colname = 'val_loss'
+                    elif top_n_by == 'auc':
+                        val_metric_colname = 'val_auc'
                 gs_res = gs_res.sort_values(by=val_metric_colname, ascending=ascending)
                 # try:
                 #     # in grid search result of catboost, it's 'val_AUC',
