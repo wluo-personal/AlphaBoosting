@@ -43,7 +43,9 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
 
     if len(categorical_features) > 0:
         embed_outdim = nn_params.get('cat_emb_outdim')  # could be a constant or a dict (col name:embed out dim)
+        temp_count = 0 ##############################################
         for col in categorical_features:
+            temp_count += 1 ##############################################
             # construct data for training, validation and prediction
             train_dict[str(col)] = np.array(X_train[col])  # in case col is not a string, but say, a number
             valid_dict[str(col)] = np.array(X_val[col])
@@ -60,12 +62,19 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             if isinstance(embed_outdim, dict):
                 embed_output_dimension = embed_outdim[col]
             else:
-                embed_output_dimension = np.min([embed_outdim, embed_input_dim])
+                embed_output_dimension = np.min([embed_outdim, int(embed_input_dim/2)])
             total_cate_embedding_dimension += embed_output_dimension
             module_logger.debug('Col [{}]: embed dim: input {}, output {}'
                                 .format(col, embed_input_dim, embed_output_dimension))
-            embed_node = Embedding(embed_input_dim, embed_output_dimension)(cat_input)
+            embed_node = Embedding(embed_input_dim,
+                                   embed_output_dimension,
+                                   trainable=True,
+                                   embeddings_regularizer=l2(0.001),
+                                   input_length=1
+                                   )(cat_input)
             embed_nodes_list.append(embed_node)
+            if temp_count == 2:
+                break ###################################################################################
         embed_layer = concatenate(embed_nodes_list)
         if nn_params['cat_emb_drop_rate'] > 0:
             embed_layer = SpatialDropout1D(nn_params['cat_emb_drop_rate'])(embed_layer)

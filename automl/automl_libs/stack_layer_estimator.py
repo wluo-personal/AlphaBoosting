@@ -7,7 +7,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import cross_val_score
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, log_loss
 from scipy.sparse import csr_matrix, hstack, vstack
 from keras.layers import Dense, Embedding, Input, LSTM, GRU, Bidirectional, \
     GlobalMaxPool1D, Dropout, BatchNormalization
@@ -256,10 +256,18 @@ class CatBoostBLE(BaseLayerEstimator):
         self._model.fit(x, y, eval_set=eval_set, verbose_eval=self._verbose_eval,
                         cat_features=categorical_features_indices)
         if x_val is not None and y_val is not None:
-            val_metric = roc_auc_score(y_val, self._model.get_test_evals()[0][0])
+            metric = self._params['eval_metric']
+            if metric == 'Logloss':
+                # for unknown reason, self._model.get_test_evals()[0][0] does not work for logloss
+                val_metric = log_loss(y_val, self._model.predict_proba(x_val)[:, 1])
+            elif metric == 'AUC':
+                val_metric = roc_auc_score(y_val, self._model.get_test_evals()[0][0])
+            else:
+                raise ValueError('{} is not supported in catb(automl) yet. Support: Logloss, AUC'.format(metric))
+        if self._params['eval_metric'] == 'Logloss':
+            train_metric = log_loss(y, self._model.predict_proba(x)[:, 1])
+        elif self._params['eval_metric'] == 'AUC':
             train_metric = roc_auc_score(y, self._model.get_test_evals()[1][0])
-        else:
-            train_metric = roc_auc_score(self.y, self._model.get_test_evals()[0][0])
         self._params['iterations'] = self._model.tree_count_
         self.logger.info('Iter: {}. val_auc: {} | train_auc: {}'
                          .format(self._params['iterations'],
