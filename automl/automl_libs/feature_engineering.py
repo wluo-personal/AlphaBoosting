@@ -1,9 +1,13 @@
+import sys,os
+sys.path.append(os.path.join(os.path.dirname(__file__),'../automl_libs'))
 from collections import defaultdict
-from automl_libs import utils
-from automl_libs import feature_engineering as fe
+import utils
+import feature_engineering as fe
 import pandas as pd
 import logging, gc
 import numpy as np
+import warnings
+from sklearn.model_selection import StratifiedKFold
 module_logger = logging.getLogger(__name__)
 
 def count(df, cols, dummy_col, generated_feature_name, params=None):
@@ -318,7 +322,7 @@ def count_std_over_mean(df, cols, dummy_col, generated_feature_name, params=None
     return r
 
 # params['n']: n, params['fillna']: fillna, cols[-1]: time
-def time_to_n(df, cols, dummy_col, generated_feature_name, params={'n':1,'fillna':np.nan}):
+def time_to_n_next(df, cols, dummy_col, generated_feature_name, params={'n':1,'fillna':np.nan}):
     """Returns dataframe of one feature that consist of 
     integers that indicates the time needed to reach the nth next occurrence of the specific value.
     n=1 indicates the next occurence.
@@ -384,13 +388,30 @@ def time_to_n(df, cols, dummy_col, generated_feature_name, params={'n':1,'fillna
     group_cols = cols[:-1]
     calc_col = cols[-1]
     n = int(params['n'])
-    m = int(params['fillna'])
+    m = params['fillna']
+    try:
+        m = int(params['fillna'])
+    except:
+        pass
     result = (df[cols].groupby(by=group_cols)[calc_col].shift(-n) - df[calc_col]).fillna(m)
-    result = result.astype(utils.set_type(result, 'int')).to_frame()
+    try:
+        result = result.astype(utils.set_type(result, 'int')).to_frame()
+    except:
+        result = result.to_frame()
     del n, m
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return result
+
+def time_to_n_previous(df, cols, dummy_col, generated_feature_name, params={'n':1,'fillna':np.nan}):
+    """
+    in params, n should be greater than 0
+    """
+    n = int(params['n'])
+    if n > 0:
+        n = -n
+    params['n'] = n
+    return time_to_n_next(df, cols, dummy_col, generated_feature_name, params)
 
 
 def count_in_previous_n_time_unit(df, cols, dummy_col, generated_feature_name, params=None):
@@ -525,3 +546,50 @@ def count_in_next_n_time_unit(df, cols, dummy_col, generated_feature_name, param
     gc.collect()
     module_logger.debug('feature generated: {}'.format(generated_feature_name))
     return r
+
+def target_mean(train,test,train_index=None,holdout_index=None,col=[],
+                  target='click',num_folds=5,seed=23):
+    """
+    perform calculate mean(conditional probability)
+    train: dataframe
+    test: dataframe
+    target: the col used to calculate mean
+    train_index: None or list. which is used to do n fold mean caculation
+    holdout_index: None or list. If not None, this part will never be used as historical data. no data leak.
+    col: group by cols
+    
+    """
+    feature_name='new_features'
+    if holdout_index is None:
+        train_cv = train.copy()
+        holdout = None
+    else:
+        if train_index is None:
+            warnings.warn('train index is None. Now need to calculate. If you parse the value, it will be more efficient ')
+            train_index = list(set(train.index) - set(holdout_index))
+        train_cv = train.loc[train_index].copy()
+        holdout = train.loc[holdout_index].copy()
+        holdout_list = []
+    sf = StratifiedKFold(n_splits= num_folds, shuffle=True, random_state=seed)
+
+    train_return = train[col].copy()
+    test_return = test[col].copy()
+    train_return[feature_name] = np.nan
+    test_return[feature_name] = np.nan
+    test_list = []
+    
+    val_index_monitor = []
+    for t_index,v_index in sf.split(train_cv,train_cv[target]):
+        history = train_cv.iloc[t_index].copy()
+        mapping = history.groupby(col)[target].mean().reset_index().rename({target:feature_name},axis=1)
+        val = train_cv.iloc[v_index].copy()
+        val_index_monitor.extend(list(val.index))
+        train_return.loc[val.index,feature_name] = val[col].merge(mapping,how='left',left_on=col,right_on=col).drop(col,axis=1)[feature_name].values
+        if holdout is not None:
+            holdout_list.append(holdout[col].merge(mapping,how='left',left_on=col,right_on=col).drop(col,axis=1)[feature_name].values)
+        test_list.append(test[col].merge(mapping,how='left',left_on=col,right_on=col).drop(col,axis=1)[feature_name].values)
+    if holdout is not None:
+        train_return.loc[holdout.index,feature_name] = np.mean(np.array(holdout_list),axis=0)
+    test_return[feature_name] = np.mean(np.array(test_list),axis=0)
+    val_index_monitor.extend(list(holdout.index))
+    return train_return[feature_name].values,test_return[feature_name].values

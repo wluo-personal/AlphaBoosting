@@ -13,6 +13,7 @@ val_index.json
 *.hdf5
 .ipynb_checkpoints
 *.pyc
+*.pickle
 *.pkl
 *.ftr
 *.swp
