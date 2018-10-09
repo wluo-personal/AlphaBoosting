@@ -284,22 +284,18 @@ if __name__ == '__main__':
     num_folds = 5
     seed = 1001
     
-    train = pd.read_pickle(FILE.train_ori.value)
+    train = pd.read_pickle(FILE.train_final.value)
     module_logger.info('train shape is: {}'.format(train.shape))
     train_length = len(train)
-    test = pd.read_pickle(FILE.test_ori.value)
+    test = pd.read_pickle(FILE.test_final.value)
     module_logger.info('test shape is: {}'.format(test.shape))
     
     train_index = train.index
     holdout_index = None
-#     train_index = pickle.load(open(FILE.train_index.value,'rb'))
-#     holdout_index = pickle.load(open(FILE.holdout_index.value,'rb'))
+
 
     X = pd.concat([train,test],sort=False)
-    X_shiyi = pd.read_pickle(FILE.shiyi_fillna_ori.value)
-    module_logger.info(X_shiyi.shape)
-
-    X = X.merge(X_shiyi[['time_hour','instance_id']],how='inner',on='instance_id')
+    
 
 
     ignore_columns = ['instance_id','time','click'] + ['creative_is_js', 'creative_is_voicead', 'app_paid']
@@ -336,6 +332,6 @@ if __name__ == '__main__':
                                           holdout_index_list=holdout_index,
                                           nondoc_cols=non_doc_col,
                                           doc_cols=doc_col,
-                                          tolerance=0,
+                                          tolerance=30,
                                           preds_batch=5000)
-    save_oof(train_save,test_save,cv_,ta_,ho_,file_name='tttt',path=os.path.join(os.path.dirname(__file__),'../../data/nn_ebd/'))
+    save_oof(train_save,test_save,cv_,ta_,ho_,file_name='best_single',path=os.path.join(os.path.dirname(__file__),'../../data/nn_ebd/'))

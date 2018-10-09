@@ -217,6 +217,7 @@ def get_nn_model(cols,doc_cols=[],numu_cols=[]):
         embed_base = float(nn_params['embed_base'])
         conVFilter = int(nn_params['conVFilter'])
         kernelSize = int(nn_params['kernelSize'])
+        gruSize = int(nn_params['gruSize'])
         module_logger.info('load nn from parameter list: {}'.format(nn_params))
     except:
         module_logger.error('load nn parameter failed. will use default parameters')
@@ -225,6 +226,7 @@ def get_nn_model(cols,doc_cols=[],numu_cols=[]):
         embed_base = 1.5
         conVFilter = 25
         kernelSize = 3
+        gruSize = 25
     for col in cols:
         max_feature = len(info_dict[prefix_input_nonDoc+col]['tok'].index_word)
         embed_size = int(np.log2(max_feature)/np.log2(embed_base))
@@ -257,7 +259,7 @@ def get_nn_model(cols,doc_cols=[],numu_cols=[]):
                             embeddings_regularizer=l2(0.0005),
                             name='ebd_rnn_'+col)(cur_input)
         x = SpatialDropout1D(spartialD)(embed_layer)
-        x = Bidirectional(CuDNNGRU(25, return_sequences=True))(x)
+        x = Bidirectional(CuDNNGRU(gruSize, return_sequences=True))(x)
         x = Conv1D(conVFilter, kernel_size = kernelSize, padding = "valid", kernel_initializer = "glorot_uniform")(x)
         x_aveP = GlobalAveragePooling1D()(x)
         x_maxP = GlobalMaxPooling1D()(x)
@@ -300,13 +302,11 @@ def random_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for x in range(size))
 
 def generate_grid_search():
-    lr = [0.0008,0.0005,0.0012,0.0015]
-    s_drop = [0.5]
-#     s_drop = [0.3,0.5,0.6]
-    embed_base = [1.5]
-#     embed_base = [1.3,1.5,1.8]
-    gru = [25]
-    conV_filter = [25]
+    lr = [0.001,0.0009,0.0008,]
+    s_drop = [0.5,0.4]
+    embed_base = [1.5,1.3,1.8]
+    gru = [25,50]
+    conV_filter = [25,50]
     conV_kernel = [3]
     l_list = []
     s_list = []
@@ -314,22 +314,30 @@ def generate_grid_search():
     filter_list = []
     kernel_list = []
     file_name_list = []
+    gru_list = []
     for l in lr:
         for s in s_drop:
             for eb in embed_base:
-                for cf in conV_filter:
-                    for ck in conV_kernel:
-                        l_list.append(l)
-                        s_list.append(s)
-                        e_list.append(eb)
-                        filter_list.append(cf)
-                        kernel_list.append(ck)
-                        while True:
-                            file = random_generator()
-                            if file not in file_name_list:
-                                file_name_list.append(file)
-                                break
-    report = pd.DataFrame({'lr':l_list,'spartialD':s_list,'embed_base':e_list,'conVFilter':filter_list,'kernelSize':kernel_list})
+                for g in gru:
+                    for cf in conV_filter:
+                        for ck in conV_kernel:
+                            l_list.append(l)
+                            s_list.append(s)
+                            e_list.append(eb)
+                            filter_list.append(cf)
+                            kernel_list.append(ck)
+                            gru_list.append(g)
+                            while True:
+                                file = random_generator()
+                                if file not in file_name_list:
+                                    file_name_list.append(file)
+                                    break
+    report = pd.DataFrame({'lr':l_list,
+                           'spartialD':s_list,
+                           'embed_base':e_list,
+                           'conVFilter':filter_list,
+                           'kernelSize':kernel_list,
+                           'gruSize':gru_list})
     report['fileName'] = file_name_list
     report['ori_index'] = report.index
     report['train_mean'] = np.nan   
@@ -348,10 +356,10 @@ if __name__ == '__main__':
     num_folds = 5
     seed = 1001
     
-    train = pd.read_pickle(FILE.train_ori.value)
+    train = pd.read_pickle(FILE.train_final.value)
     module_logger.info('train shape is: {}'.format(train.shape))
     train_length = len(train)
-    test = pd.read_pickle(FILE.test_ori.value)
+    test = pd.read_pickle(FILE.test_final.value)
     module_logger.info('test shape is: {}'.format(test.shape))
     
     train_index = train.index
@@ -360,10 +368,10 @@ if __name__ == '__main__':
 #     holdout_index = pickle.load(open(FILE.holdout_index.value,'rb'))
 
     X = pd.concat([train,test],sort=False)
-    X_shiyi = pd.read_pickle(FILE.shiyi_fillna_ori.value)
-    module_logger.info(X_shiyi.shape)
+#     X_shiyi = pd.read_pickle(FILE.shiyi_fillna_ori.value)
+#     module_logger.info(X_shiyi.shape)
 
-    X = X.merge(X_shiyi[['time_hour','instance_id']],how='inner',on='instance_id')
+#     X = X.merge(X_shiyi[['time_hour','instance_id']],how='inner',on='instance_id')
 
 
     ignore_columns = ['instance_id','time','click'] + ['creative_is_js', 'creative_is_voicead', 'app_paid']
@@ -406,6 +414,7 @@ if __name__ == '__main__':
             nn_params['embed_base'] = ava.iloc[0]['embed_base']
             nn_params['conVFilter'] = ava.iloc[0]['conVFilter']
             nn_params['kernelSize'] = ava.iloc[0]['kernelSize']
+            nn_params['gruSize'] = ava.iloc[0]['gruSize']
          
             
             train_df = train[['instance_id']].copy()
