@@ -91,7 +91,7 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
         #     embed_layer = SpatialDropout1D(nn_params['cat_emb_drop_rate'])(embed_layer)
         # categorical_node = Flatten()(embed_layer)
 
-    numerical_features = []  ##################################################################################
+    # numerical_features = []  ##################################################################################
     if len(numerical_features) > 0:
         key_for_numerical_features = 'numerical_features'
         train_dict[key_for_numerical_features] = X_train[numerical_features].values

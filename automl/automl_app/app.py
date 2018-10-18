@@ -342,23 +342,56 @@ class AlphaBoosting:
                                 pg_save_path=self.OUTDIR, metric=self.config_dict['report_metric'],
                                 ascending=self.config_dict['report_metric_rank_ascending'], gs_result_path=gs_result_path)
             elif layer == 2:
+                stratified = self.config_dict['sn_stratified']
+                oof_nfolds = self.config_dict['oof_nfolds_layer2'],
+                if type(self.config_dict['oof_nfolds_layer2']) == list:
+                    random_bounds = self.config_dict['oof_nfolds_layer2']
+                    oof_nfolds = np.random.randint(random_bounds[0], random_bounds[1]+1)
+                    stratified = np.random.choice([True, False]),
+                    if self.fixseed == 0:
+                        seed = np.random.randint(1000000)
+                model_data_list = self.config_dict['layer1_thresh_or_chosen_for_layer2']
+                random_select_amt = self.config_dict['random_model_data_layer3']
+                if type(random_select_amt) == list:
+                    random_select_amt = np.random.randint(random_select_amt[0], random_select_amt[1]+1)
+                    model_data_list = pd.Series(model_data_list).sample(n=random_select_amt).tolist()
+                    self.logger.info('Random mode for layer3: nfolds: {}. model_data amt: {}. stratified: {}'
+                                     .format(oof_nfolds, random_select_amt, stratified))
+                else:
+                    model_data_list = model_data_list[layer2_counter]
                 stacknet.layer2andmore(train, y_test, label_cols, params_gen=self.params_gen,
                                        oof_path=oof_path, metric=self.config_dict['report_metric'],
-                                       oof_nfolds=self.config_dict['oof_nfolds_layer2'], seed=seed,
-                                       stratified=self.config_dict['sn_stratified'],
-                                       layer1_thresh_or_chosen=
-                                       self.config_dict['layer1_thresh_or_chosen_for_layer2'][layer2_counter],
+                                       oof_nfolds=oof_nfolds, seed=seed, stratified=stratified,
+                                       layer1_thresh_or_chosen=model_data_list,
                                        layer='layer2', layer2andmore_models=self.config_dict['layer2_models'],
                                        auto_sub_func=self.auto_sub_func, preds_save_path=self.OUTDIR+'sn_saved_preds/')
                 layer2_counter += 1
             elif layer == 3:
+                stratified = self.config_dict['sn_stratified']
+                oof_nfolds = self.config_dict['oof_nfolds_layer3'],
+                if type(oof_nfolds) != int:
+                    oof_nfolds = oof_nfolds[0]
+                print('=============================================', oof_nfolds)
+                model_data_list = self.config_dict['layer2_thresh_or_chosen_for_layer3']
+                if type(self.config_dict['oof_nfolds_layer3']) == list:
+                    random_bounds = self.config_dict['oof_nfolds_layer3']
+                    oof_nfolds = np.random.randint(random_bounds[0], random_bounds[1] + 1)
+                    stratified = np.random.choice([True, False]),
+                    if self.fixseed == 0:
+                        seed = np.random.randint(1000000)
+                random_select_amt = self.config_dict['random_model_data_layer3']
+                if type(random_select_amt) == list:
+                    random_select_amt = np.random.randint(random_select_amt[0], random_select_amt[1] + 1)
+                    model_data_list = pd.Series(model_data_list).sample(n=random_select_amt).tolist()
+                    self.logger.info('Random mode for layer3: nfolds: {}. model_data amt: {}. stratified: {}'
+                                     .format(oof_nfolds, random_select_amt, stratified))
+                else:
+                    model_data_list = model_data_list[layer3_counter]
                 stacknet.layer2andmore(train, y_test, label_cols, params_gen=self.params_gen,
                                        oof_path=oof_path, metric=self.config_dict['report_metric'],
-                                       oof_nfolds=self.config_dict['oof_nfolds_layer3'], seed=seed,
-                                       stratified=self.config_dict['sn_stratified'],
-                                       layer1_thresh_or_chosen=
-                                       self.config_dict['layer2_thresh_or_chosen_for_layer3'][layer3_counter],
-                                       layer='layer3', layer2andmore_models=self.config_dict['layer3_models'],
+                                       oof_nfolds=oof_nfolds, seed=seed, stratified=stratified,
+                                       layer1_thresh_or_chosen=model_data_list,
+                                       layer=self.config_dict['higher_layer_label'], layer2andmore_models=self.config_dict['layer3_models'],
                                        auto_sub_func=self.auto_sub_func, preds_save_path=self.OUTDIR+'sn_saved_preds/')
                 layer3_counter += 1
 

@@ -370,8 +370,13 @@ class NNBLE(BaseLayerEstimator):
         if y_te is not None:
             val_data = [self._te_dict, y_te]
         y_tr = np.array(y_tr).reshape(-1,)
+        cb = [
+            EarlyStopping(monitor=self._params['monitor'], mode=self._params['mode'],
+                          patience=self._params['patience'], verbose=2, restore_best_weights=True)
+        ]
         self._model.fit(tr_dict, y_tr, validation_data=val_data, epochs=self._best_epoch,
-                        batch_size=self._params['batch_size'], verbose=self._verbose_eval)
+                        batch_size=self._params['batch_size'], verbose=self._verbose_eval,
+                        callbacks=cb)
 
     def predict(self, case):
         """

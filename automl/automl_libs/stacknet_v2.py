@@ -336,6 +336,7 @@ def layer2andmore(train, y_test, label_cols, params_gen, oof_path, oof_nfolds, s
         model_id = model_data.split('__')[0]
         base_layer_results_repo.add_score(model_data, layer2andmore_cv_score[model_data])
         base_layer_results_repo.update_report(model_data, 'chosen model_data', layer2andmore_chosen_model_data[model_id])
+        base_layer_results_repo.update_report(model_data, 'seed', seed)
         base_layer_results_repo.update_report(model_data, 'nfolds', oof_nfolds)
         base_layer_results_repo.update_report(model_data, 'stratified', stratified)
 
