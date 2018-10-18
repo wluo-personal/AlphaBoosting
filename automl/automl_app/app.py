@@ -69,30 +69,30 @@ class AlphaBoosting:
                 raise ValueError('since validation_index is null in config file, validation_ratio must be provided')
             self.validation_ratio = val_ratio
             self.validation_index = list(range(int(self.train_len*(1-self.validation_ratio)), self.train_len))
-            
+
         downsampling_amount_changed = False
         down_sampling_ratio_changed = False
         val_index_changed = False
-        
+
         if not os.path.exists(self.run_record_url):
             self.logger.info('Run record file [{}] not found. Begin the first time run...'.format(self.run_record_url))
         else:
             self.logger.info('Run record file [{}] found. Continue from the previous run...'.format(self.run_record_url))
             with open(self.run_record_url, 'r') as f: run_record_dict = json.load(f)
-            
+
             # check if validation and down sampling need to be redone
             prev_down_sampling_amt = run_record_dict['down_sampling_amt']
             if prev_down_sampling_amt != self.down_sampling_amt:
                 self.logger.debug('Down sampling amount: previous: {}. new: {}'
                                   .format(prev_down_sampling_amt, self.down_sampling_amt))
                 downsampling_amount_changed = True
-            
+
             prev_down_sampling_ratio = run_record_dict['down_sampling_ratio']
             if self.down_sampling_ratio != prev_down_sampling_ratio:
                 self.logger.debug('Down sampling ratio: previous: {}. new: {}'
                                   .format(prev_down_sampling_ratio, self.down_sampling_ratio))
                 down_sampling_ratio_changed = True
-                
+
             prev_validation_index = pickle.load(open(run_record_dict['validation_index'],'rb'))
             if self.validation_index != prev_validation_index:
                 self.logger.debug('Validation index: previous: {}... new: {}...'
@@ -104,19 +104,19 @@ class AlphaBoosting:
         if not os.path.exists(self.OUTDIR): os.makedirs(self.OUTDIR)
         if not os.path.exists(self.TEMP_DATADIR): os.makedirs(self.TEMP_DATADIR)
         if not os.path.exists(self.FEATUREDIR): os.makedirs(self.FEATUREDIR)
-            
+
         # generate todo list: c
         self.logger.info('generate todo list')
         to_do_dict = self._generate_todo_list()
-        
+
         if downsampling_amount_changed or down_sampling_ratio_changed or val_index_changed:
             to_do_dict[self.Stage.VALIDATION_DOWNSAMPLING_GEN_INDEX.name] = False
             to_do_dict[self.Stage.VALIDATION_DOWNSAMPLING_SPLIT.name] = False
             to_do_dict[self.Stage.VALIDATION_DOWNSAMPLING_GEN.name] = False
-            
+
             if os.path.exists(self.TEMP_DATADIR + 'down_sampling_idx.pkl'): os.remove(self.TEMP_DATADIR + 'down_sampling_idx.pkl')
             if os.path.exists(self.TEMP_DATADIR + 'val.pkl'): os.remove(self.TEMP_DATADIR + 'val.pkl')
-            for i in range(prev_down_sampling_amt): 
+            for i in range(prev_down_sampling_amt):
                 if os.path.exists(self.TEMP_DATADIR + str(i) + '.pkl'):
                     os.remove(self.TEMP_DATADIR + str(i) + '.pkl')
             shutil.rmtree(self.TEMP_DATADIR + 'split/')
@@ -124,11 +124,11 @@ class AlphaBoosting:
         # feature engineering
         self.logger.info('STAGE: ' + self.Stage.FEATURE_ENGINEERING.name)
         self._feature_engineering(to_do_dict)
-        
+
         # get validation
         # self.logger.info('STAGE: ' + self.Stage.VALIDATION_DOWNSAMPLING_GEN.name)
         self._validation_and_down_sampling(to_do_dict)
-        
+
         # concatenant test: c
         self.logger.info('STAGE: ' + self.Stage.CONCAT_DATA.name)
         self._concat_test(to_do_dict)
@@ -157,6 +157,7 @@ class AlphaBoosting:
         self.test = pd.read_pickle(self.test_data_url).reset_index(drop=True)
         self.df = pd.concat([self.train, self.test], sort=False, ignore_index=True).reset_index(drop=True)
         self.train_len = self.train.shape[0]
+
 
     @staticmethod
     def _renew_status(to_do_dict, key, file_url):

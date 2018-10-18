@@ -9,7 +9,7 @@ from keras.optimizers import Adam
 import numpy as np
 import pandas as pd
 import re
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, log_loss
 import pdb
 import logging
 module_logger = logging.getLogger(__name__)
@@ -36,16 +36,17 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
     feature_input_list = []
     embed_nodes_list = []
     numerical_features = []
-    total_cate_embedding_dimension = 0
+    # total_cate_embedding_dimension = 0
     for col in X_train:
         if col not in categorical_features:
             numerical_features.append(col)
 
+    # assume all cat columns are label encoded
     if len(categorical_features) > 0:
         embed_outdim = nn_params.get('cat_emb_outdim')  # could be a constant or a dict (col name:embed out dim)
-        temp_count = 0 ##############################################
         for col in categorical_features:
-            temp_count += 1 ##############################################
+            # if col not in ['adid', 'model', 'city', 'creative_type', 'inner_slot_id', 'user_tags_sorted', 'creative_id']:
+            #     continue
             # construct data for training, validation and prediction
             train_dict[str(col)] = np.array(X_train[col])  # in case col is not a string, but say, a number
             valid_dict[str(col)] = np.array(X_val[col])
@@ -54,7 +55,8 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
             # construct categorical input nodes
             cat_input = Input(shape=(1,), name=str(col))
             feature_input_list.append(cat_input)
-            embed_input_dim = np.max([X_train[col].nunique(), X_val[col].nunique(), X_test[col].nunique()]) + 1
+            # embed_input_dim = np.max([X_train[col].nunique(), X_val[col].nunique(), X_test[col].nunique()]) + 1
+            embed_input_dim = np.max([X_train[col].max(), X_val[col].max(), X_test[col].max()]) + 1
             # why +1 in embed_input_dim: because categorical cols are assumed labelencoded, which start from 0
             # so e.g. if X_train[col].max() returns 3, it means there are 3 + 1 categories: 0,1,2,3
 
@@ -63,23 +65,33 @@ def get_model(nn_params, X_train, X_val, X_test, categorical_features):
                 embed_output_dimension = embed_outdim[col]
             else:
                 embed_output_dimension = np.min([embed_outdim, int(embed_input_dim/2)])
-            total_cate_embedding_dimension += embed_output_dimension
+            embed_output_dimension = int(np.log2(embed_input_dim)/np.log2(1.5))
+            if embed_output_dimension < 2:
+                embed_output_dimension = 2
+            # total_cate_embedding_dimension += embed_output_dimension
             module_logger.debug('Col [{}]: embed dim: input {}, output {}'
                                 .format(col, embed_input_dim, embed_output_dimension))
             embed_node = Embedding(embed_input_dim,
                                    embed_output_dimension,
+                                   # input_length=1,  # depends on the dimension of train_dict[str(col)]
+                                                      # if (N,1) then 1, if (N,) then None(default)
                                    trainable=True,
-                                   embeddings_regularizer=l2(0.001),
-                                   input_length=1
+                                   embeddings_regularizer=l2(0.001)
+                                   # embeddings_initializer=RandomUniform(minval=-0.005, maxval=0.005),
                                    )(cat_input)
+            if nn_params['cat_emb_drop_rate'] > 0:
+                embed_node = SpatialDropout1D(nn_params['cat_emb_drop_rate'])(embed_node)
+            embed_node = Flatten()(embed_node)
             embed_nodes_list.append(embed_node)
-            if temp_count == 2:
-                break ###################################################################################
-        embed_layer = concatenate(embed_nodes_list)
-        if nn_params['cat_emb_drop_rate'] > 0:
-            embed_layer = SpatialDropout1D(nn_params['cat_emb_drop_rate'])(embed_layer)
-        categorical_node = Flatten()(embed_layer)
+        categorical_node = concatenate(embed_nodes_list)
 
+            # embed_nodes_list.append(embed_node)
+        # embed_layer = concatenate(embed_nodes_list)
+        # if nn_params['cat_emb_drop_rate'] > 0:
+        #     embed_layer = SpatialDropout1D(nn_params['cat_emb_drop_rate'])(embed_layer)
+        # categorical_node = Flatten()(embed_layer)
+
+    numerical_features = []  ##################################################################################
     if len(numerical_features) > 0:
         key_for_numerical_features = 'numerical_features'
         train_dict[key_for_numerical_features] = X_train[numerical_features].values
@@ -224,3 +236,39 @@ class RocAucMetricCallback(Callback):
                               self.model.predict(self.X_val,
                                                  batch_size=self.predict_batch_size))
         return logs
+
+
+class LogLossMetricCallback(Callback):
+    def __init__(self, validation_data=(), predict_batch_size=100000, include_on_batch=False):
+        super(LogLossMetricCallback, self).__init__()
+        self.predict_batch_size = predict_batch_size
+        self.include_on_batch = include_on_batch
+        self.X_val, self.y_val = validation_data
+
+    def on_batch_begin(self, batch, logs={}):
+        pass
+
+    def on_batch_end(self, batch, logs={}):
+        if self.include_on_batch:
+            self._compute_logloss(logs)
+
+    def on_train_begin(self, logs={}):
+        if not ('val_logloss' in self.params['metrics']):
+            self.params['metrics'].append('val_logloss')
+
+    def on_train_end(self, logs={}):
+        pass
+
+    def on_epoch_begin(self, epoch, logs={}):
+        pass
+
+    def on_epoch_end(self, epoch, logs={}):
+        self._compute_logloss(logs)
+
+    def _compute_logloss(self, logs):
+        logs['val_logloss'] = float('inf')
+        if self.validation_data:
+            logs['val_logloss'] = log_loss(self.y_val, self.model.predict(self.X_val,
+                                                                          batch_size=self.predict_batch_size))
+        return logs
+

@@ -268,8 +268,11 @@ class XgbGS(GridSearch):
 class NNGS(GridSearch):
 
     def init_more(self):
-        if self.gs_params['monitor'] != 'val_auc' and self.gs_params['monitor'] != 'val_loss':
-            raise ValueError('{} is not a supported <monitor> in NN(automl) yet. Support: val_auc, val_loss'
+        if self.gs_params['monitor'] != 'val_auc' \
+                and self.gs_params['monitor'] != 'val_loss' \
+                and self.gs_params['monitor'] != 'val_logloss':
+            raise ValueError('{} is not a supported <monitor> in NN(automl) yet. '
+                             'Support: val_auc, val_loss(avg loss of batches), val_logloss(loss of the epoch)'
                              .format(self.gs_params['monitor']))
         self.model, self.nn_train_dict, self.nn_valid_dict, self.nn_test_dict = \
             nn_libs.get_model(self.gs_params, self.X_train, self.X_val, self.X_test, self.categorical_feature)
@@ -292,6 +295,10 @@ class NNGS(GridSearch):
             # include the following before EarlyStopping
             cb.append(nn_libs.RocAucMetricCallback(validation_data=(self.nn_valid_dict, self.y_val),
                                                    predict_batch_size=self.gs_params['pred_batch_size']))
+        elif self.gs_params['monitor'] == 'val_logloss':
+            # include the following before EarlyStopping
+            cb.append(nn_libs.LogLossMetricCallback(validation_data=(self.nn_valid_dict, self.y_val),
+                                                   predict_batch_size=self.gs_params['pred_batch_size']))
         cb.extend([
             EarlyStopping(monitor=self.gs_params['monitor'], mode=self.gs_params['mode'],
                           patience=self.gs_params['patience'], verbose=2),
@@ -312,6 +319,8 @@ class NNGS(GridSearch):
             self.logger.info('val_auc: {:.5f}'.format(val_auc))
         elif self.gs_params['monitor'] == 'val_loss':
             bst_epoch = np.argmin(hist.history['val_loss'])
+        elif self.gs_params['monitor'] == 'val_logloss':
+            bst_epoch = np.argmin(hist.history['val_logloss'])
         trn_loss = hist.history['loss'][bst_epoch]
         trn_acc = hist.history['acc'][bst_epoch]  # TODO: acc might not be there if regression problem
         val_loss = hist.history['val_loss'][bst_epoch]
