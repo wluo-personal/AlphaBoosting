@@ -12,6 +12,7 @@ from NN_K_FOLD import *
 import numpy as np
 import string
 import random
+import gc
 
 from keras.layers import Dense,Input,LSTM,Bidirectional,Activation,Conv1D,GRU,CuDNNGRU,Flatten,BatchNormalization,CuDNNLSTM,Activation,BatchNormalization
 from keras.callbacks import Callback
@@ -354,7 +355,7 @@ if __name__ == '__main__':
     prefix_input_nonDoc = 'input_'
     prefix_input_Doc = 'input_rnn_'
     num_folds = 5
-    seed = 1001
+    
     
     train = pd.read_pickle(FILE.train_final.value)
     module_logger.info('train shape is: {}'.format(train.shape))
@@ -368,10 +369,9 @@ if __name__ == '__main__':
 #     holdout_index = pickle.load(open(FILE.holdout_index.value,'rb'))
 
     X = pd.concat([train,test],sort=False)
-#     X_shiyi = pd.read_pickle(FILE.shiyi_fillna_ori.value)
-#     module_logger.info(X_shiyi.shape)
-
-#     X = X.merge(X_shiyi[['time_hour','instance_id']],how='inner',on='instance_id')
+    seed = np.random.randint(1000)
+    seed = 1001
+    module_logger.info('seed is set to: {}'.format(seed))
 
 
     ignore_columns = ['instance_id','time','click'] + ['creative_is_js', 'creative_is_voicead', 'app_paid']
@@ -380,13 +380,13 @@ if __name__ == '__main__':
     doc_col = ['user_tags','model']
     non_doc_col = [f for f in need_process_col if f not in doc_col]
     
-    info_dict,train_fold_dict,val_fold_dict,holdout_input_dict,test_input_dict,train_fold_y,val_fold_y,holdout_y,val_index_list,sequence_size_dict =encap_data_dict(X,train_length,
-                    train_index,
-                    holdout_index,
-                    target='click',
-                    ignore_columns=ignore_columns,
-                    doc_col=['user_tags','model'],
-                    non_doc_col_append=[])
+#     info_dict,train_fold_dict,val_fold_dict,holdout_input_dict,test_input_dict,train_fold_y,val_fold_y,holdout_y,val_index_list,sequence_size_dict =encap_data_dict(X,train_length,
+#                     train_index,
+#                     holdout_index,
+#                     target='click',
+#                     ignore_columns=ignore_columns,
+#                     doc_col=['user_tags','model'],
+#                     non_doc_col_append=[])
 
     
     
@@ -394,6 +394,16 @@ if __name__ == '__main__':
     train_save_path = os.path.join(os.path.dirname(__file__),'../../data/nn_ebd/train/{}.pkl')
     test_save_path = os.path.join(os.path.dirname(__file__),'../../data/nn_ebd/test/{}.csv')
     while True:
+        seed = np.random.randint(1000)
+#         seed = 1001
+        module_logger.info('seed is set to: {}'.format(seed)) 
+        info_dict,train_fold_dict,val_fold_dict,holdout_input_dict,test_input_dict,train_fold_y,val_fold_y,holdout_y,val_index_list,sequence_size_dict =encap_data_dict(X,train_length,
+                    train_index,
+                    holdout_index,
+                    target='click',
+                    ignore_columns=ignore_columns,
+                    doc_col=['user_tags','model'],
+                    non_doc_col_append=[])
         try:
             report = pd.read_csv(report_path)
         except:
@@ -436,7 +446,8 @@ if __name__ == '__main__':
                                                   nondoc_cols=non_doc_col,
                                                   doc_cols=doc_col,
                                                   tolerance=30,
-                                                  preds_batch=5000)
+                                                train_batch_size=25000,
+                                                  preds_batch=25000)
             report = pd.read_csv(report_path)
             report.loc[report.ori_index==ori_index,'train_mean'] = ta_
             report.loc[report.ori_index==ori_index,'cv'] = cv_
@@ -447,6 +458,8 @@ if __name__ == '__main__':
             test_save.to_csv(test_save_path.format(fileName),index=False)
             module_logger.info('saving report')
             report.to_csv(report_path,index=False)
+            gc.collect()
+            time.sleep(5)
             
         
         

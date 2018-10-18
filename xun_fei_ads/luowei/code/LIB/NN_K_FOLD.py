@@ -56,7 +56,7 @@ def train_each_fold(get_nn_model,input_train_dict,input_val_dict,y_train,y_val,c
                   verbose=2,
                   shuffle=True,
                   )
-        preds = model.predict(input_val_dict,5000,verbose=2)
+        preds = model.predict(input_val_dict,25000,verbose=2)
         logloss = log_loss(y_val,preds)
         roc = roc_auc_score(y_val,preds)
         print(logloss)
