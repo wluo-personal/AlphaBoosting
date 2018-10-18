@@ -11,7 +11,7 @@ import pickle
 from NN_K_FOLD import *
 import numpy as np
 
-from keras.layers import Dense,Input,LSTM,Bidirectional,Activation,Conv1D,GRU,CuDNNGRU,Flatten,BatchNormalization,CuDNNLSTM,Activation,BatchNormalization
+from keras.layers import Dense,Input,LSTM,Bidirectional,Activation,Conv1D,GRU,CuDNNGRU,Flatten,BatchNormalization,CuDNNLSTM,Activation,BatchNormalization,Lambda,Add,Multiply,Subtract
 from keras.callbacks import Callback
 from keras.layers import Dropout,Embedding,GlobalMaxPooling1D, MaxPooling1D, Add, Flatten
 from keras.preprocessing import text, sequence
@@ -194,8 +194,32 @@ def encap_data_dict(X,train_length,
         
     
     
-    
+def selfpool(x,dim=1):
+    if dim == 1:
+        def pol(x,n):
+            return x[:,n,:]
+    elif dim == 2:
+        def pol(x,n):
+            return x[:,:,n]
+    else:
+        raise ValueError('dim {} not support'.format(dim))
+    f_pol = Lambda(pol,arguments={'n'})
+    l = int(x.shape[dim])
+    inter_list = []
+    for index in range(l):
+        f_pol = Lambda(pol,arguments={'n':index})
+        inter_list.append(f_pol(x))
+    x_add = Add()(inter_list)
+    x_inter1 = Multiply()([x_add,x_add])
+    multi_list = []
+    for each in inter_list:
+        multi_list.append(Multiply()([each,each]))
+    x_inter2 = Add()(multi_list)
+    x_second = Subtract()([x_inter1,x_inter2])
+    return x_second
+
 def get_nn_model(cols,doc_cols=[],numu_cols=[]):
+    
     """
     cols, used to do ebd and dense layers
     doc_cols: used to do rnn
@@ -236,11 +260,16 @@ def get_nn_model(cols,doc_cols=[],numu_cols=[]):
                             embeddings_regularizer=l2(0.0005),
                             name='ebd_rnn_'+col)(cur_input)
         x = SpatialDropout1D(0.5)(embed_layer)
-        x = Bidirectional(CuDNNGRU(25, return_sequences=True))(x)
-        x = Conv1D(25, kernel_size = 3, padding = "valid", kernel_initializer = "glorot_uniform")(x)
-        x_aveP = GlobalAveragePooling1D()(x)
-        x_maxP = GlobalMaxPooling1D()(x)
-        x = concatenate([x_aveP,x_maxP])
+        if col == 'user_tags':
+            x = Bidirectional(CuDNNGRU(25, return_sequences=True))(x)
+            x = Conv1D(25, kernel_size = 3, padding = "valid", kernel_initializer = "glorot_uniform")(x)
+            x_aveP = GlobalAveragePooling1D()(x)
+            x_maxP = GlobalMaxPooling1D()(x)
+            x = concatenate([x_aveP,x_maxP])
+        else:
+            x = Bidirectional(CuDNNGRU(25, return_sequences=True))(x)
+            x = selfpool(x,dim=1)
+            
         input_list.append(cur_input)
         concat_list.append(x)
 
@@ -263,11 +292,26 @@ def get_nn_model(cols,doc_cols=[],numu_cols=[]):
         x = concatenate([x]+numu_list)
 #         x = BatchNormalization()(x)
         
-    x = Dense(512, activation='relu')(x)
-    x = Dropout(0.2)(x)
+#     x = Dense(512, activation='relu')(x)
+#     x = Dropout(0.2)(x)
     
-    x = Dense(128, activation='relu')(x)
-    x = Dropout(0.2)(x)
+#     x = Dense(128, activation='relu')(x)
+#     x = Dropout(0.2)(x)
+
+    x1 = Dense(512, activation='relu')(x)
+    x1 = Dropout(0.2)(x1)
+    
+    x2 = concatenate([x,x1])
+    x2_ = Dense(128, activation='relu')(x2)
+    x2_ = Dropout(0.2)(x2_)
+    
+    x3 = concatenate([x,x1,x2_])
+    x3_ = Dense(64, activation='relu')(x3)
+    x3_ = Dropout(0.2)(x3_)
+    
+    x = concatenate([x,x1,x2_,x3_])
+    x = Dropout(0.5)(x)
+
 
     preds = Dense(1, activation="sigmoid")(x)
     model = Model(input_list, preds)
@@ -282,7 +326,9 @@ if __name__ == '__main__':
     prefix_input_nonDoc = 'input_'
     prefix_input_Doc = 'input_rnn_'
     num_folds = 5
+    seed = np.random.randint(1000)
     seed = 1001
+    module_logger.info('seed is set to: {}'.format(seed))
     
     train = pd.read_pickle(FILE.train_final.value)
     module_logger.info('train shape is: {}'.format(train.shape))
@@ -333,5 +379,6 @@ if __name__ == '__main__':
                                           nondoc_cols=non_doc_col,
                                           doc_cols=doc_col,
                                           tolerance=30,
+                                        train_batch_size=25000,
                                           preds_batch=5000)
-    save_oof(train_save,test_save,cv_,ta_,ho_,file_name='best_single',path=os.path.join(os.path.dirname(__file__),'../../data/nn_ebd/'))
+    save_oof(train_save,test_save,cv_,ta_,ho_,file_name='best_single_batch2w5_baibing_modelInteract',path=os.path.join(os.path.dirname(__file__),'../../data/nn_ebd/'))
